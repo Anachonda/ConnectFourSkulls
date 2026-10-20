@@ -1,10 +1,12 @@
 // Ambient Halloween scene: moon, drifting bats, fog, silhouetted graveyard.
 import { useMemo } from "react";
 import { Bat } from "./Pieces";
+import { useLang } from "@/lib/i18n";
 
 type BatSpec = { top: string; duration: string; delay: string; scale: number };
 
 export function SpookyScene() {
+  const { t } = useLang();
   const bats = useMemo<BatSpec[]>(
     () =>
       Array.from({ length: 7 }).map((_, i) => ({
@@ -110,10 +112,10 @@ function Graveyard() {
     { left: "16%", w: 38, h: 52, tilt: 4, label: "???" },
     { left: "26%", w: 54, h: 72, tilt: -2, label: "BOO" },
     { left: "40%", w: 42, h: 58, tilt: 8, label: "1666" },
-    { left: "52%", w: 48, h: 68, tilt: -5, label: "HIER" },
+    { left: "52%", w: 48, h: 68, tilt: -5, label: t.graveHere },
     { left: "66%", w: 36, h: 50, tilt: 3, label: "X" },
     { left: "76%", w: 52, h: 70, tilt: -7, label: "R.I.P" },
-    { left: "88%", w: 40, h: 56, tilt: 5, label: "DOOD" },
+    { left: "88%", w: 40, h: 56, tilt: 5, label: t.graveDead },
   ];
   return (
     <svg

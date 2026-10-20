@@ -22,6 +22,7 @@ import {
   unlockAudio,
 } from "@/lib/audio";
 import { useBackgroundMusic, unlockMusic } from "@/lib/music";
+import { useLang, type Lang } from "@/lib/i18n";
 import { GrimReaper, RottenSkullHead, SkullHead, Spiderweb } from "@/components/Pieces";
 import { SpookyScene } from "@/components/SpookyScene";
 
@@ -33,6 +34,7 @@ const COLS_PX = 7;
 const CELL = 64; // px
 
 export default function App() {
+  const { lang, setLang, t } = useLang();
   const [screen, setScreen] = useState<"start" | "game">("start");
   const [difficulty, setDifficulty] = useState<Difficulty>("normaal");
   const [soundOn, setSoundOn] = useState(false);
@@ -56,6 +58,9 @@ export default function App() {
       {/* Corner spiderwebs */}
       <CornerWebs />
 
+      {/* Language switcher */}
+      <LangSwitcher lang={lang} onPick={setLang} />
+
       <main className="relative z-10 mx-auto flex min-h-screen max-w-5xl flex-col items-center px-4 py-8">
         {screen === "start" ? (
           <StartScreen
@@ -78,6 +83,37 @@ export default function App() {
           />
         )}
       </main>
+    </div>
+  );
+}
+
+/* ---------------- Language switcher ---------------- */
+
+function LangSwitcher({ lang, onPick }: { lang: Lang; onPick: (l: Lang) => void }) {
+  return (
+    <div className="fixed right-3 top-3 z-50 flex gap-1.5">
+      <button
+        onClick={() => onPick("en")}
+        className={`rounded-md px-2.5 py-1 text-sm font-semibold transition-all ${
+          lang === "en"
+            ? "bg-orange-500/20 text-orange-300 ring-1 ring-orange-500/50"
+            : "bg-black/40 text-amber-200/60 hover:text-amber-100"
+        }`}
+        aria-label="English"
+      >
+        EN
+      </button>
+      <button
+        onClick={() => onPick("nl")}
+        className={`rounded-md px-2.5 py-1 text-sm font-semibold transition-all ${
+          lang === "nl"
+            ? "bg-orange-500/20 text-orange-300 ring-1 ring-orange-500/50"
+            : "bg-black/40 text-amber-200/60 hover:text-amber-100"
+        }`}
+        aria-label="Nederlands"
+      >
+        NL
+      </button>
     </div>
   );
 }
@@ -119,6 +155,7 @@ function StartScreen({
   onToggleSound: () => void;
   onStart: () => void;
 }) {
+  const { t } = useLang();
   return (
     <div className="flex w-full max-w-2xl flex-1 flex-col items-center justify-center text-center">
       {/* Title */}
@@ -127,34 +164,33 @@ function StartScreen({
         <RottenSkullHead className="h-12 w-12 floaty sm:h-16 sm:w-16" />
       </div>
       <h1 className="font-nosifer text-4xl leading-tight text-orange-500 sm:text-6xl">
-        Vier hoofden
-        <br /> op een rij
+        {t.title}
       </h1>
       <p className="font-creep mt-2 text-xl text-amber-200/90 sm:text-2xl">
-        Leg vier afgehakte hoofden op een rij in de urnenmuur.
+        {t.subtitle}
       </p>
 
       {/* Difficulty card */}
       <div className="mt-10 w-full max-w-md rounded-2xl border border-purple-900/50 bg-black/50 p-6 backdrop-blur">
-        <h2 className="font-creep mb-4 text-2xl text-orange-400">Kies je tegenstander</h2>
+        <h2 className="font-creep mb-4 text-2xl text-orange-400">{t.chooseOpponent}</h2>
         <div className="grid gap-3">
           <DifficultyOption
-            label="Sluipend spook"
-            sub="Makkelijk"
+            label={t.diffEasyLabel}
+            sub={t.diffEasySub}
             value="makkelijk"
             current={difficulty}
             onPick={onChangeDifficulty}
           />
           <DifficultyOption
-            label="Wraakzuchtige heks"
-            sub="Normaal"
+            label={t.diffNormalLabel}
+            sub={t.diffNormalSub}
             value="normaal"
             current={difficulty}
             onPick={onChangeDifficulty}
           />
           <DifficultyOption
-            label="Grafrover"
-            sub="Moeilijk"
+            label={t.diffHardLabel}
+            sub={t.diffHardSub}
             value="moeilijk"
             current={difficulty}
             onPick={onChangeDifficulty}
@@ -167,20 +203,19 @@ function StartScreen({
             className="btn-spooky flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-amber-100"
           >
             <span>{soundOn ? "🔊" : "🔇"}</span>
-            <span>{soundOn ? "Geluid aan" : "Geluid uit"}</span>
+            <span>{soundOn ? t.soundOn : t.soundOff}</span>
           </button>
           <button
             onClick={onStart}
             className="btn-spooky rounded-lg px-6 py-3 font-creep text-xl text-orange-300"
           >
-            Betreed de begraafplaats →
+            {t.enterGraveyard} →
           </button>
         </div>
       </div>
 
       <p className="mt-6 max-w-md text-xs text-amber-200/50">
-        Jij speelt met het verse doodshoofd. De computer met een ouder, verrot hoof. Zet je geluid
-        aan voor de volle griezelige ervaring.
+        {t.startHint}
       </p>
     </div>
   );
@@ -235,6 +270,7 @@ function GameScreen({
   onToggleSound: () => void;
   onExit: () => void;
 }) {
+  const { t } = useLang();
   const [board, setBoard] = useState<Board>(() => emptyBoard());
   const [turn, setTurn] = useState<Player>(1);
   const [score, setScore] = useState({ player: 0, ai: 0, draws: 0 });
@@ -298,7 +334,6 @@ function GameScreen({
             : { ...s, ai: s.ai + 1 },
         );
         if (!muted) (who === "player" ? playWin() : playLose());
-        // After the line has been highlighted for a moment, show the overlay.
         clearRevealTimer();
         revealTimer.current = window.setTimeout(() => {
           setWinner(who);
@@ -324,26 +359,22 @@ function GameScreen({
       moveCount.current += 1;
       setBoard(nextBoard);
 
-      // The Grim Reaper mows the bottom row every REAPER_EVERY moves.
       if (moveCount.current % REAPER_EVERY === 0) {
         const hasBottomPieces = nextBoard[5].some((v) => v !== 0);
         if (hasBottomPieces) {
           setReaperActive(true);
           setBusy(true);
           if (!muted) playSwoosh();
-          // Swoosh the scythe, then mow the row and let pieces fall.
           clearReaperTimer();
           reaperTimer.current = window.setTimeout(() => {
             const mowed = mowBottomRow(nextBoard);
             const mowedSet = new Set(mowed.mowed.map(([r, c]) => `${r}-${c}`));
             setMowedCells(mowedSet);
-            // Remove the fading markers once the animation finishes.
             window.setTimeout(() => setMowedCells(new Set()), 650);
             setBoard(mowed.board);
             setShake(true);
             window.setTimeout(() => setShake(false), 420);
 
-            // A mow could create an unexpected win; check for it.
             const postWin = findWin(mowed.board);
             if (postWin) {
               const who: Winner = postWin.player === 1 ? "player" : "ai";
@@ -373,7 +404,6 @@ function GameScreen({
           }, 1100);
           return;
         }
-        // No bottom pieces to mow; skip the spectacle.
       }
 
       setShake(true);
@@ -404,8 +434,6 @@ function GameScreen({
     [board, busy, gameOver, turn, muted, addScreamer, finishMove],
   );
 
-  // AI turn. Re-entry guarded with a ref (not `busy`) so a re-render from
-  // setBusy(true) doesn't cancel the very timer we just scheduled.
   useEffect(() => {
     if (gameOver || revealing || reaperActive || turn !== 2) {
       aiPending.current = false;
@@ -480,34 +508,32 @@ function GameScreen({
 
   return (
     <>
-      {/* Title */}
       <header className="mb-4 text-center">
         <h1 className="font-nosifer text-3xl text-orange-500 sm:text-5xl">
-          Vier hoofden op een rij
+          {t.title}
         </h1>
         <p className="font-creep mt-1 text-lg text-amber-200/80 sm:text-xl">
-          Leg vier afgehakte hoofden op een rij in de urnenmuur.
+          {t.subtitle}
         </p>
       </header>
 
-      {/* Score + controls */}
       <section className="mb-4 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 rounded-xl border border-purple-900/40 bg-black/40 px-4 py-3 backdrop-blur">
         <ScorePanel
-          label="Jij"
+          label={t.you}
           value={score.player}
           badge={<SkullHead className="h-7 w-7" />}
           active={turn === 1 && !gameOver}
           accent="text-orange-400"
         />
         <ScorePanel
-          label="Gelijk"
+          label={t.draw}
           value={score.draws}
           badge={<span className="text-lg">⚖️</span>}
           active={false}
           accent="text-amber-200"
         />
         <ScorePanel
-          label="Spook"
+          label={t.ghost}
           value={score.ai}
           badge={<RottenSkullHead className="h-7 w-7" />}
           active={turn === 2 && !gameOver}
@@ -518,8 +544,8 @@ function GameScreen({
           <button
             onClick={onToggleSound}
             className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
-            aria-label={soundOn ? "Geluid uit" : "Geluid aan"}
-            title={soundOn ? "Geluid uit" : "Geluid aan"}
+            aria-label={soundOn ? t.soundOff : t.soundOn}
+            title={soundOn ? t.soundOff : t.soundOn}
           >
             {soundOn ? "🔊" : "🔇"}
           </button>
@@ -527,19 +553,19 @@ function GameScreen({
             onClick={newGame}
             className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
           >
-            Nieuw potje
+            {t.newGame}
           </button>
           <button
             onClick={resetAll}
             className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
           >
-            Reset
+            {t.reset}
           </button>
           <button
             onClick={onExit}
             className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
           >
-            ← Menu
+            ← {t.menu}
           </button>
         </div>
       </section>
@@ -548,36 +574,35 @@ function GameScreen({
       <div className="mb-3 h-7 text-center font-creep text-xl">
         {reaperActive && (
           <span className="reveal-banner text-red-400">
-            Magere Hein maait de onderste rij weg!
+            {t.reaperMows}
           </span>
         )}
         {!reaperActive && revealing && revealWinner === "player" && (
-          <span className="reveal-banner text-orange-400">Vier op een rij! De hoofden juichen...</span>
+          <span className="reveal-banner text-orange-400">{t.revealPlayer}</span>
         )}
         {!reaperActive && revealing && revealWinner === "ai" && (
-          <span className="reveal-banner text-emerald-300">Het spook vormt een rij... het lacht.</span>
+          <span className="reveal-banner text-emerald-300">{t.revealAi}</span>
         )}
         {!reaperActive && revealing && revealWinner === "draw" && (
-          <span className="reveal-banner text-amber-200">De begraafplaats is vol...</span>
+          <span className="reveal-banner text-amber-200">{t.revealDraw}</span>
         )}
         {!reaperActive && !revealing && !gameOver && turn === 1 && (
-          <span className="text-orange-400">Jij bent aan zet — kies een graf.</span>
+          <span className="text-orange-400">{t.yourTurn}</span>
         )}
         {!reaperActive && !revealing && !gameOver && turn === 2 && (
-          <span className="text-emerald-300">Het spook voelt aan je nek... het denkt na.</span>
+          <span className="text-emerald-300">{t.aiThinking}</span>
         )}
         {!reaperActive && !revealing && gameOver && winner === "player" && (
-          <span className="text-orange-400">Jij wint! De hoofden juichen.</span>
+          <span className="text-orange-400">{t.youWin}</span>
         )}
         {!reaperActive && !revealing && gameOver && winner === "ai" && (
-          <span className="text-emerald-300">Het spook lacht je uit... volgend keer beter.</span>
+          <span className="text-emerald-300">{t.aiWins}</span>
         )}
         {!reaperActive && !revealing && gameOver && winner === "draw" && (
-          <span className="text-amber-200">De begraafplaats is vol. Gelijkspel.</span>
+          <span className="text-amber-200">{t.drawEnd}</span>
         )}
       </div>
 
-      {/* Board */}
       <div className={`relative ${shake ? "shake" : ""}`}>
         <Board
           board={board}
@@ -591,10 +616,8 @@ function GameScreen({
           mowedCells={mowedCells}
         />
 
-        {/* Grim Reaper sweeping across the bottom row */}
         {reaperActive && (
           <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden rounded-2xl">
-            {/* Scythe glow trail along the bottom */}
             <div
               className="scythe-trail absolute bottom-6 left-0 right-0 h-10"
               style={{
@@ -609,7 +632,6 @@ function GameScreen({
           </div>
         )}
 
-        {/* Game over overlay — only after the reveal phase */}
         {gameOver && !revealing && (
           <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/70 backdrop-blur-sm">
             <div className="text-center">
@@ -620,30 +642,30 @@ function GameScreen({
               </div>
               <h2 className="font-nosifer mb-1 text-3xl text-orange-400">
                 {winner === "player"
-                  ? "JE OVERLEEFDE!"
+                  ? t.youSurvived
                   : winner === "ai"
-                    ? "SPOOK OVERWINNAAR"
-                    : "STILTE IN HET GRAF"}
+                    ? t.ghostWinner
+                    : t.silence}
               </h2>
               <p className="font-creep mb-4 text-lg text-amber-200/90">
                 {winner === "player"
-                  ? "De hoofden juichen. Nog een potje?"
+                  ? t.winPrompt
                   : winner === "ai"
-                    ? "Het spook lacht je uit. Wraak?"
-                    : "De urnenmuur is vol. Nog een keer?"}
+                    ? t.losePrompt
+                    : t.drawPrompt}
               </p>
               <div className="flex justify-center gap-3">
                 <button
                   onClick={newGame}
                   className="btn-spooky rounded-lg px-6 py-3 font-creep text-lg text-orange-300"
                 >
-                  Nog een potje
+                  {t.anotherGame}
                 </button>
                 <button
                   onClick={onExit}
                   className="btn-spooky rounded-lg px-5 py-3 text-base text-amber-100"
                 >
-                  ← Menu
+                  ← {t.menu}
                 </button>
               </div>
             </div>
@@ -651,17 +673,15 @@ function GameScreen({
         )}
       </div>
 
-      {/* Legend */}
       <section className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm text-amber-100/80">
         <div className="flex items-center gap-2">
-          <SkullHead className="h-6 w-6" /> Jij — vers doodshoofd
+          <SkullHead className="h-6 w-6" /> {t.youFreshSkull}
         </div>
         <div className="flex items-center gap-2">
-          <RottenSkullHead className="h-6 w-6" /> Spook — verrot hoof
+          <RottenSkullHead className="h-6 w-6" /> {t.ghostRottingHead}
         </div>
         <p className="basis-full text-center text-xs text-amber-200/60">
-          Klik op een urn om een hoofd in het graf te laten vallen. Vier op een rij wint.
-          Let op: om de 10 zetten maait Magere Hein de onderste rij weg!
+          {t.legendHint}
         </p>
       </section>
     </>
@@ -723,10 +743,8 @@ function Board({
 }) {
   return (
     <div className="urn-wall rounded-2xl p-3 sm:p-5">
-      {/* Top ledge */}
       <div className="urn-ledge mb-2 h-3 rounded-t" />
       <div className="relative">
-        {/* Column hover ghost-piece preview */}
         {interactive && hoverCol !== null && <PreviewPiece col={hoverCol} board={board} />}
 
         <div
@@ -748,7 +766,6 @@ function Board({
                   onClick={() => interactive && onPickCol(c)}
                   style={{ cursor: interactive ? "pointer" : "default" }}
                 >
-                  {/* Column highlight */}
                   <div
                     className="col-glow pointer-events-none absolute inset-x-0 -inset-y-2 rounded"
                     style={{
@@ -756,7 +773,6 @@ function Board({
                         "linear-gradient(180deg, rgba(255,140,0,0.10) 0%, rgba(255,140,0,0) 100%)",
                     }}
                   />
-                  {/* Urn niche */}
                   <UrnNiche isWin={isWin} revealing={revealing}>
                     {cell === 1 && (
                       <SkullHead
@@ -770,13 +786,11 @@ function Board({
                         style={{ ["--drop-from" as string]: `-${(r + 1) * 90}px` }}
                       />
                     )}
-                    {/* Mowed-piece fade-out ghost (shown briefly over the niche) */}
                     {mowed && (
                       <div className="mow-fade pointer-events-none absolute inset-0 flex items-center justify-center">
                         <SkullHead className="h-[86%] w-[86%] opacity-80" />
                       </div>
                     )}
-                    {/* Scream text bubble */}
                     {screamer && (
                       <div
                         className="scream-pop pointer-events-none absolute z-20 whitespace-nowrap font-creep text-lg"
@@ -796,7 +810,6 @@ function Board({
           )}
         </div>
       </div>
-      {/* Bottom ledge / base */}
       <div className="urn-ledge mt-2 h-4 rounded-b" />
     </div>
   );
@@ -818,9 +831,7 @@ function UrnNiche({
       }`}
       style={{ width: CELL, height: CELL, maxWidth: "14vw", maxHeight: "14vw" }}
     >
-      {/* Inner shadow ring (niche opening) */}
       <div className="absolute inset-0 rounded-full ring-2 ring-stone-900/80" />
-      {/* Stone frame ring */}
       <div className="absolute inset-0 rounded-full ring-1 ring-stone-500/30" />
       {children}
     </div>
