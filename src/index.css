@@ -131,12 +131,17 @@
 }
 
 /* Column hover glow */
-.col-hover:hover .col-glow {
+.col-hover:hover .col-glow,
+.col-hover:active .col-glow {
   opacity: 1;
 }
 .col-glow {
   opacity: 0;
   transition: opacity 0.18s ease;
+}
+.col-hover:active {
+  transform: scale(0.96);
+  transition: transform 0.1s ease;
 }
 
 /* Subtle board texture */
@@ -205,6 +210,13 @@
   transform: translateY(-1px);
 }
 .btn-spooky:active { transform: translateY(0); }
+
+/* Ensure tap targets are large enough on touch devices */
+@media (max-width: 640px) {
+  .btn-spooky {
+    min-height: 44px;
+  }
+}
 
 /* Scream text burst */
 @keyframes scream-pop {

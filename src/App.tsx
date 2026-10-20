@@ -611,7 +611,7 @@ function GameScreen({
         </p>
       </header>
 
-      <section className="mb-4 flex w-full max-w-2xl flex-wrap items-center justify-between gap-3 rounded-xl border border-purple-900/40 bg-black/40 px-4 py-3 backdrop-blur">
+      <section className="mb-4 flex w-full max-w-2xl flex-wrap items-center justify-between gap-2 rounded-xl border border-purple-900/40 bg-black/40 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 backdrop-blur">
         <ScorePanel
           label={t.you}
           value={score.player}
@@ -634,7 +634,7 @@ function GameScreen({
           accent="text-emerald-300"
         />
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={onToggleSound}
             className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
@@ -645,13 +645,13 @@ function GameScreen({
           </button>
           <button
             onClick={() => startRound(false)}
-            className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
+            className="btn-spooky rounded-lg px-3 py-2 text-xs text-amber-100 sm:text-sm"
           >
             {t.newGame}
           </button>
           <button
             onClick={newMatch}
-            className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
+            className="btn-spooky rounded-lg px-3 py-2 text-xs text-amber-100 sm:text-sm"
           >
             {t.newMatch}
           </button>
@@ -741,7 +741,7 @@ function GameScreen({
         )}
 
         {gameOver && !revealing && !matchOver && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/70 backdrop-blur-sm">
+          <div className="absolute inset-0 flex items-center justify-center overflow-y-auto rounded-2xl bg-black/70 p-4 backdrop-blur-sm">
             <div className="text-center">
               <div className="mb-3 flex items-center justify-center gap-3">
                 {winner === "player" && <SkullHead className="h-14 w-14 flicker" />}
@@ -788,7 +788,7 @@ function GameScreen({
           </div>
         )}
         {matchOver && !revealing && (
-          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/80 backdrop-blur-sm">
+          <div className="absolute inset-0 flex items-center justify-center overflow-y-auto rounded-2xl bg-black/80 p-4 backdrop-blur-sm">
             <div className="text-center">
               <div className="mb-3 flex items-center justify-center gap-3">
                 {matchWinner === "player" && <SkullHead className="h-16 w-16 flicker" />}
@@ -858,10 +858,10 @@ function ScorePanel({
           : "border-purple-900/30 bg-black/20"
       }`}
     >
-      <div className="flex h-8 w-8 items-center justify-center">{badge}</div>
+      <div className="flex h-7 w-7 items-center justify-center sm:h-8 sm:w-8">{badge}</div>
       <div className="leading-tight">
-        <div className={`font-creep text-base ${accent}`}>{label}</div>
-        <div className="font-mono text-lg text-amber-50">{value}</div>
+        <div className={`font-creep text-sm sm:text-base ${accent}`}>{label}</div>
+        <div className="font-mono text-base text-amber-50 sm:text-lg">{value}</div>
       </div>
     </div>
   );
