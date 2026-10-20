@@ -201,3 +201,27 @@ export function playReaper() {
   audio.volume = 0.7;
   void audio.play().catch(() => {});
 }
+
+// Occasional atmospheric scare effects — infrequent jump-scares.
+export function playThunder() {
+  const audio = new Audio(`${import.meta.env.BASE_URL}Thunder.mp3`);
+  audio.volume = 0.5;
+  void audio.play().catch(() => {});
+}
+
+export function playFence() {
+  const audio = new Audio(`${import.meta.env.BASE_URL}Fence.mp3`);
+  audio.volume = 0.45;
+  void audio.play().catch(() => {});
+}
+
+export function playCat() {
+  const audio = new Audio(`${import.meta.env.BASE_URL}Cat.mp3`);
+  audio.volume = 0.5;
+  void audio.play().catch(() => {});
+}
+
+export function playRandomScare() {
+  const fns = [playThunder, playFence, playCat];
+  fns[Math.floor(Math.random() * fns.length)]();
+}

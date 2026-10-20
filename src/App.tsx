@@ -16,6 +16,7 @@ import {
 import {
   playFootsteps,
   playLose,
+  playRandomScare,
   playReaper,
   playScream,
   playSwoosh,
@@ -295,6 +296,7 @@ function GameScreen({
   const revealTimer = useRef<number | null>(null);
   const moveCount = useRef(0);
   const reaperTimer = useRef<number | null>(null);
+  const scareTimer = useRef<number | null>(null);
 
   const muted = !soundOn;
   const gameOver = winner !== null;
@@ -496,6 +498,28 @@ function GameScreen({
     };
   }, [turn, gameOver, revealing, reaperActive, board, difficulty, muted, addScreamer, finishMove]);
 
+  // Occasional atmospheric scare sounds — every 30–70s, only mid-game.
+  useEffect(() => {
+    if (muted || gameOver || revealing || reaperActive) {
+      if (scareTimer.current) {
+        window.clearTimeout(scareTimer.current);
+        scareTimer.current = null;
+      }
+      return;
+    }
+    const delay = 30000 + Math.random() * 40000;
+    scareTimer.current = window.setTimeout(() => {
+      playRandomScare();
+      scareTimer.current = null;
+    }, delay);
+    return () => {
+      if (scareTimer.current) {
+        window.clearTimeout(scareTimer.current);
+        scareTimer.current = null;
+      }
+    };
+  }, [muted, gameOver, revealing, reaperActive, board]);
+
   const newGame = useCallback(() => {
     if (aiTimer.current) {
       window.clearTimeout(aiTimer.current);
@@ -503,6 +527,10 @@ function GameScreen({
     }
     clearRevealTimer();
     clearReaperTimer();
+    if (scareTimer.current) {
+      window.clearTimeout(scareTimer.current);
+      scareTimer.current = null;
+    }
     aiPending.current = false;
     moveCount.current = 0;
     setBoard(emptyBoard());
