@@ -6,7 +6,6 @@ import { useLang } from "@/lib/i18n";
 type BatSpec = { top: string; duration: string; delay: string; scale: number };
 
 export function SpookyScene() {
-  const { t } = useLang();
   const bats = useMemo<BatSpec[]>(
     () =>
       Array.from({ length: 7 }).map((_, i) => ({
@@ -107,6 +106,7 @@ function WitchSilhouette() {
 }
 
 function Graveyard() {
+  const { t } = useLang();
   const stones = [
     { left: "4%", w: 46, h: 64, tilt: -6, label: "R.I.P" },
     { left: "16%", w: 38, h: 52, tilt: 4, label: "???" },
