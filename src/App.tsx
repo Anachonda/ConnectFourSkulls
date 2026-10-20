@@ -365,7 +365,7 @@ function GameScreen({
 
       const turnMod = moveCount.current % REAPER_EVERY;
       const doMow = turnMod === 0 && nextBoard[5].some((v) => v !== 0);
-      const doReap = !doMow && turnMod !== 0 && moveCount.current >= 5 && Math.random() < 0.18;
+      const doReap = !doMow && turnMod !== 0 && moveCount.current >= 5 && Math.random() < 0.08;
 
       if (doMow || doReap) {
         const mode: "mow" | "reap" = doMow ? "mow" : "reap";
@@ -395,47 +395,35 @@ function GameScreen({
           setReaperMode(mode);
         }
         const activeMode = hasTargets ? mode : (mode === "mow" ? "reap" : "mow");
+        const result = activeMode === "mow" ? mowBottomRow(nextBoard) : reapSkulls(nextBoard);
+        if (findWin(result.board)) {
+          setShake(true);
+          window.setTimeout(() => setShake(false), 420);
+          const next = (mover === 1 ? 2 : 1) as Player;
+          setTurn(next);
+          setBusy(false);
+          return;
+        }
         setReaperActive(true);
         setBusy(true);
         if (!muted) playFootsteps();
         clearReaperTimer();
         reaperTimer.current = window.setTimeout(() => {
           if (!muted) playReaper();
-          const result = activeMode === "mow" ? mowBottomRow(nextBoard) : reapSkulls(nextBoard);
-          const mowedSet = new Set(result.mowed.map(([r, c]) => `${r}-${c}`));
-          setMowedCells(mowedSet);
-          window.setTimeout(() => setMowedCells(new Set()), 650);
-          setBoard(result.board);
+          reaperTimer.current = window.setTimeout(() => {
+            const mowedSet = new Set(result.mowed.map(([r, c]) => `${r}-${c}`));
+            setMowedCells(mowedSet);
+            window.setTimeout(() => setMowedCells(new Set()), 650);
+            setBoard(result.board);
           setShake(true);
           window.setTimeout(() => setShake(false), 420);
 
-          const postWin = findWin(result.board);
-          if (postWin) {
-            const who: Winner = postWin.player === 1 ? "player" : "ai";
-            setWinLine(postWin.line);
-            setRevealWinner(who);
-            setRevealing(true);
-            setScore((s) =>
-              who === "player"
-                ? { ...s, player: s.player + 1 }
-                : { ...s, ai: s.ai + 1 },
-            );
-            if (!muted) (who === "player" ? playWin() : playLose());
-            clearRevealTimer();
-            revealTimer.current = window.setTimeout(() => {
-              setWinner(who);
-              setRevealing(false);
-              setReaperActive(false);
-              setBusy(false);
-            }, 1200);
-            return;
-          }
-
-          setReaperActive(false);
-          const next = (mover === 1 ? 2 : 1) as Player;
-          setTurn(next);
-          setBusy(false);
-        }, 2800);
+            setReaperActive(false);
+            const next = (mover === 1 ? 2 : 1) as Player;
+            setTurn(next);
+            setBusy(false);
+          }, 500);
+        }, 3600);
         return;
       }
 
