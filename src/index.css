@@ -237,6 +237,13 @@
 }
 .reaper-sweep { animation: reaper-sweep 6.2s ease-in-out both; }
 
+@keyframes reaper-breathe {
+  0%, 100% { transform: translateY(0) rotate(0deg); filter: brightness(0.82) contrast(1.15) drop-shadow(0 0 18px rgba(255, 30, 20, 0.28)); }
+  45% { transform: translateY(-5px) rotate(-1deg); filter: brightness(0.96) contrast(1.2) drop-shadow(0 0 28px rgba(255, 30, 20, 0.5)); }
+  62% { transform: translateY(-2px) rotate(1deg); filter: brightness(0.88) contrast(1.18) drop-shadow(0 0 22px rgba(255, 30, 20, 0.35)); }
+}
+.reaper-figure { object-fit: contain; animation: reaper-breathe 2.8s ease-in-out infinite; }
+
 /* Scythe glow trail */
 @keyframes scythe-trail {
   0% { opacity: 0; }

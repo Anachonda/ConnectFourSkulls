@@ -219,53 +219,12 @@ export function Spiderweb({
 // "mow the bottom row" event. Drawn large and sweeping.
 export function GrimReaper({ className, style }: PieceProps) {
   return (
-    <svg viewBox="0 0 200 200" className={className} style={style} aria-hidden>
-      <defs>
-        <radialGradient id="reaperHood" cx="48%" cy="36%" r="72%">
-          <stop offset="0%" stopColor="#454554" />
-          <stop offset="48%" stopColor="#171722" />
-          <stop offset="100%" stopColor="#020205" />
-        </radialGradient>
-        <linearGradient id="scytheG" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#f4f4f2" />
-          <stop offset="45%" stopColor="#9c9ca8" />
-          <stop offset="100%" stopColor="#363641" />
-        </linearGradient>
-        <radialGradient id="reaperEyes" cx="50%" cy="50%" r="65%">
-          <stop offset="0%" stopColor="#ff7860" />
-          <stop offset="35%" stopColor="#e01812" />
-          <stop offset="100%" stopColor="#270000" />
-        </radialGradient>
-        <filter id="reaperGlow" x="-100%" y="-100%" width="300%" height="300%">
-          <feGaussianBlur stdDeviation="2" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-
-      <path d="M151 18 Q178 23 190 57 Q185 37 157 28 Q181 48 174 82 Q164 52 139 45 Z" fill="url(#scytheG)" stroke="#d8d8df" strokeWidth="1.5" />
-      <path d="M153 24 Q177 34 177 65" stroke="#fff" strokeWidth="1.2" fill="none" opacity="0.8" />
-      <line x1="151" y1="25" x2="39" y2="192" stroke="#22150d" strokeWidth="6" strokeLinecap="round" />
-      <line x1="150" y1="27" x2="40" y2="191" stroke="#765438" strokeWidth="1.5" strokeLinecap="round" />
-
-      <path d="M56 69 Q48 43 72 25 Q101 4 132 29 Q151 44 140 72 L157 181 Q144 194 119 187 Q96 201 69 187 Q43 194 28 181 Q57 151 56 69 Z" fill="url(#reaperHood)" stroke="#000" strokeWidth="2" />
-      <path d="M69 78 Q98 61 132 78 L143 174 Q125 188 109 177 L96 192 L79 176 Q61 187 47 174 Z" fill="#010104" opacity="0.85" />
-      <path d="M57 58 Q43 47 50 31 Q61 39 73 43 M136 55 Q154 42 145 27 Q132 37 124 43" fill="none" stroke="#585866" strokeWidth="5" strokeLinecap="round" opacity="0.7" />
-      <path d="M67 113 Q52 126 45 157 M129 111 Q145 131 146 159 M88 112 L78 174 M111 111 L124 175" fill="none" stroke="#353541" strokeWidth="4" opacity="0.8" />
-
-      <path d="M76 43 Q99 24 124 44 L122 78 Q101 94 78 77 Z" fill="#c9c6b9" stroke="#050505" strokeWidth="1.5" />
-      <path d="M84 52 Q91 42 98 52 Q93 65 85 62 Z M105 51 Q113 41 119 52 Q117 64 107 62 Z" fill="#080609" />
-      <ellipse cx="92" cy="56" rx="3" ry="4" fill="url(#reaperEyes)" filter="url(#reaperGlow)" />
-      <ellipse cx="112" cy="55" rx="3" ry="4" fill="url(#reaperEyes)" filter="url(#reaperGlow)" />
-      <path d="M96 67 Q101 72 106 67 L108 78 L94 78 Z" fill="#080609" />
-      <g stroke="#080609" strokeWidth="1">
-        <path d="M96 69 V76 M100 70 V77 M104 70 V77" />
-      </g>
-
-      <g fill="#c9c6b9" stroke="#17121a" strokeWidth="1">
-        <ellipse cx="119" cy="83" rx="9" ry="6" transform="rotate(-28 119 83)" />
-        <path d="M115 80 l-2 11 M120 79 l1 12 M125 80 l4 10" />
-        <ellipse cx="64" cy="128" rx="8" ry="5" transform="rotate(-55 64 128)" />
-      </g>
-    </svg>
+    <img
+      src={`${import.meta.env.BASE_URL}grim-reaper-reference.webp`}
+      className={`reaper-figure ${className ?? ""}`}
+      style={style}
+      alt=""
+      aria-hidden="true"
+    />
   );
 }
