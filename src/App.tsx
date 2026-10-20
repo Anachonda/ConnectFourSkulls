@@ -498,27 +498,33 @@ function GameScreen({
     };
   }, [turn, gameOver, revealing, reaperActive, board, difficulty, muted, addScreamer, finishMove]);
 
-  // Occasional atmospheric scare sounds — every 30–70s, only mid-game.
+  // Occasional atmospheric scare sounds — self-rescheduling, independent of moves.
   useEffect(() => {
-    if (muted || gameOver || revealing || reaperActive) {
+    if (muted || gameOver) {
       if (scareTimer.current) {
         window.clearTimeout(scareTimer.current);
         scareTimer.current = null;
       }
       return;
     }
-    const delay = 30000 + Math.random() * 40000;
-    scareTimer.current = window.setTimeout(() => {
-      playRandomScare();
-      scareTimer.current = null;
-    }, delay);
+    let active = true;
+    const schedule = () => {
+      const delay = 30000 + Math.random() * 40000;
+      scareTimer.current = window.setTimeout(() => {
+        if (!active) return;
+        playRandomScare();
+        schedule();
+      }, delay);
+    };
+    schedule();
     return () => {
+      active = false;
       if (scareTimer.current) {
         window.clearTimeout(scareTimer.current);
         scareTimer.current = null;
       }
     };
-  }, [muted, gameOver, revealing, reaperActive, board]);
+  }, [muted, gameOver]);
 
   const newGame = useCallback(() => {
     if (aiTimer.current) {
