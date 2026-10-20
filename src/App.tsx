@@ -18,6 +18,7 @@ import {
   playLose,
   playRandomScare,
   playReaper,
+  playRoar,
   playScream,
   playSwoosh,
   playThump,
@@ -36,6 +37,13 @@ type WinLine = [number, number][] | null;
 
 const COLS_PX = 7;
 const CELL = 64; // px
+const MATCH_TARGET = 4;
+
+function bonusForLine(len: number): number {
+  if (len >= 6) return 3;
+  if (len === 5) return 2;
+  return 1;
+}
 
 export default function App() {
   const { lang, setLang, t } = useLang();
@@ -289,12 +297,16 @@ function GameScreen({
   const [reaperActive, setReaperActive] = useState(false);
   const [reaperMode, setReaperMode] = useState<"mow" | "reap">("mow");
   const [mowedCells, setMowedCells] = useState<Set<string>>(new Set());
+  const [lastWinLength, setLastWinLength] = useState(0);
+  const [matchOver, setMatchOver] = useState(false);
+  const [matchWinner, setMatchWinner] = useState<Winner>(null);
 
   const screamId = useRef(0);
   const aiTimer = useRef<number | null>(null);
   const aiPending = useRef(false);
   const revealTimer = useRef<number | null>(null);
   const moveCount = useRef(0);
+  const roundStarter = useRef<Player>(1);
   const reaperTimer = useRef<number | null>(null);
   const scareTimer = useRef<number | null>(null);
 
@@ -332,19 +344,35 @@ function GameScreen({
         setBoard(nextBoard);
         setWinLine(win.line);
         const who: Winner = win.player === 1 ? "player" : "ai";
+        const winLen = win.line.length;
+        setLastWinLength(winLen);
         setRevealWinner(who);
         setRevealing(true);
-        setScore((s) =>
-          who === "player"
-            ? { ...s, player: s.player + 1 }
-            : { ...s, ai: s.ai + 1 },
-        );
-        if (!muted) (who === "player" ? playWin() : playLose());
+        const pts = bonusForLine(winLen);
+        let matchDone = false;
+        let mw: Winner = null;
+        setScore((s) => {
+          const ns =
+            who === "player"
+              ? { ...s, player: s.player + pts }
+              : { ...s, ai: s.ai + pts };
+          if (ns.player >= MATCH_TARGET) { matchDone = true; mw = "player"; }
+          else if (ns.ai >= MATCH_TARGET) { matchDone = true; mw = "ai"; }
+          return ns;
+        });
+        if (!muted) {
+          who === "player" ? playWin() : playLose();
+          if (winLen >= 5) playRoar();
+        }
         clearRevealTimer();
         revealTimer.current = window.setTimeout(() => {
           setWinner(who);
           setRevealing(false);
           setBusy(false);
+          if (matchDone && mw) {
+            setMatchWinner(mw);
+            setMatchOver(true);
+          }
         }, 1200);
         return;
       }
@@ -352,6 +380,7 @@ function GameScreen({
         setBoard(nextBoard);
         setRevealWinner("draw");
         setRevealing(true);
+        setLastWinLength(0);
         setScore((s) => ({ ...s, draws: s.draws + 1 }));
         clearRevealTimer();
         revealTimer.current = window.setTimeout(() => {
@@ -526,41 +555,50 @@ function GameScreen({
     };
   }, [muted, gameOver]);
 
-  const newGame = useCallback(() => {
-    if (aiTimer.current) {
-      window.clearTimeout(aiTimer.current);
-      aiTimer.current = null;
-    }
-    clearRevealTimer();
-    clearReaperTimer();
-    if (scareTimer.current) {
-      window.clearTimeout(scareTimer.current);
-      scareTimer.current = null;
-    }
-    aiPending.current = false;
-    moveCount.current = 0;
-    setBoard(emptyBoard());
-    setTurn(1);
-    setWinner(null);
-    setRevealWinner(null);
-    setRevealing(false);
-    setReaperActive(false);
-    setReaperMode("mow");
-    setMowedCells(new Set());
-    setWinLine(null);
-    setBusy(false);
-    setScreamers([]);
-  }, [clearRevealTimer, clearReaperTimer]);
+  const startRound = useCallback(
+    (alternate: boolean) => {
+      if (aiTimer.current) {
+        window.clearTimeout(aiTimer.current);
+        aiTimer.current = null;
+      }
+      clearRevealTimer();
+      clearReaperTimer();
+      if (scareTimer.current) {
+        window.clearTimeout(scareTimer.current);
+        scareTimer.current = null;
+      }
+      aiPending.current = false;
+      moveCount.current = 0;
+      if (alternate) roundStarter.current = (roundStarter.current === 1 ? 2 : 1) as Player;
+      setBoard(emptyBoard());
+      setTurn(roundStarter.current);
+      setWinner(null);
+      setRevealWinner(null);
+      setRevealing(false);
+      setReaperActive(false);
+      setReaperMode("mow");
+      setMowedCells(new Set());
+      setWinLine(null);
+      setBusy(false);
+      setScreamers([]);
+      setLastWinLength(0);
+    },
+    [clearRevealTimer, clearReaperTimer],
+  );
 
-  const resetAll = useCallback(() => {
+  const newMatch = useCallback(() => {
     setScore({ player: 0, ai: 0, draws: 0 });
-    newGame();
-  }, [newGame]);
+    setMatchOver(false);
+    setMatchWinner(null);
+    roundStarter.current = 1;
+    startRound(false);
+  }, [startRound]);
 
   const winSet = useMemo(
     () => (winLine ? new Set(winLine.map(([r, c]) => `${r}-${c}`)) : null),
     [winLine],
   );
+  const bonusWin = useMemo(() => (winLine?.length ?? 0) >= 5, [winLine]);
 
   return (
     <>
@@ -606,16 +644,16 @@ function GameScreen({
             {soundOn ? "🔊" : "🔇"}
           </button>
           <button
-            onClick={newGame}
+            onClick={() => startRound(false)}
             className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
           >
             {t.newGame}
           </button>
           <button
-            onClick={resetAll}
+            onClick={newMatch}
             className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
           >
-            {t.reset}
+            {t.newMatch}
           </button>
           <button
             onClick={onExit}
@@ -625,6 +663,10 @@ function GameScreen({
           </button>
         </div>
       </section>
+
+      <p className="mb-2 text-center text-sm text-amber-200/60">
+        {t.matchTarget}
+      </p>
 
       {/* Turn banner */}
       <div className="mb-3 h-7 text-center font-creep text-xl">
@@ -639,10 +681,14 @@ function GameScreen({
           </span>
         )}
         {!reaperActive && revealing && revealWinner === "player" && (
-          <span className="reveal-banner text-orange-400">{t.revealPlayer}</span>
+          <span className="reveal-banner text-orange-400">
+            {lastWinLength >= 6 ? t.revealPlayerSix : lastWinLength === 5 ? t.revealPlayerFive : t.revealPlayer}
+          </span>
         )}
         {!reaperActive && revealing && revealWinner === "ai" && (
-          <span className="reveal-banner text-emerald-300">{t.revealAi}</span>
+          <span className="reveal-banner text-emerald-300">
+            {lastWinLength >= 6 ? t.revealAiSix : lastWinLength === 5 ? t.revealAiFive : t.revealAi}
+          </span>
         )}
         {!reaperActive && revealing && revealWinner === "draw" && (
           <span className="reveal-banner text-amber-200">{t.revealDraw}</span>
@@ -672,6 +718,7 @@ function GameScreen({
           hoverCol={hoverCol}
           interactive={!gameOver && !revealing && !reaperActive && turn === 1 && !busy}
           winSet={winSet}
+          bonusWin={bonusWin}
           screamers={screamers}
           revealing={revealing}
           mowedCells={mowedCells}
@@ -693,7 +740,7 @@ function GameScreen({
           </div>
         )}
 
-        {gameOver && !revealing && (
+        {gameOver && !revealing && !matchOver && (
           <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/70 backdrop-blur-sm">
             <div className="text-center">
               <div className="mb-3 flex items-center justify-center gap-3">
@@ -708,19 +755,60 @@ function GameScreen({
                     ? t.ghostWinner
                     : t.silence}
               </h2>
-              <p className="font-creep mb-4 text-lg text-amber-200/90">
-                {winner === "player"
-                  ? t.winPrompt
-                  : winner === "ai"
-                    ? t.losePrompt
-                    : t.drawPrompt}
+              {lastWinLength >= 5 && winner !== "draw" && (
+                <p className="font-creep mb-1 text-xl text-red-400">
+                  {winner === "player"
+                    ? lastWinLength >= 6 ? t.revealPlayerSix : t.revealPlayerFive
+                    : lastWinLength >= 6 ? t.revealAiSix : t.revealAiFive}
+                </p>
+              )}
+              {winner !== "draw" && (
+                <p className="font-creep mb-2 text-lg text-amber-200/90">
+                  +{bonusForLine(lastWinLength)} {t.bonusPoints}
+                </p>
+              )}
+              <p className="mb-4 text-sm text-amber-200/70">
+                {t.matchScore}: {score.player} — {score.ai}
               </p>
               <div className="flex justify-center gap-3">
                 <button
-                  onClick={newGame}
+                  onClick={() => startRound(true)}
                   className="btn-spooky rounded-lg px-6 py-3 font-creep text-lg text-orange-300"
                 >
-                  {t.anotherGame}
+                  {t.nextRound} →
+                </button>
+                <button
+                  onClick={onExit}
+                  className="btn-spooky rounded-lg px-5 py-3 text-base text-amber-100"
+                >
+                  ← {t.menu}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {matchOver && !revealing && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/80 backdrop-blur-sm">
+            <div className="text-center">
+              <div className="mb-3 flex items-center justify-center gap-3">
+                {matchWinner === "player" && <SkullHead className="h-16 w-16 flicker" />}
+                {matchWinner === "ai" && <RottenSkullHead className="h-16 w-16 floaty" />}
+              </div>
+              <h2 className="font-nosifer mb-2 text-4xl text-orange-400">
+                {matchWinner === "player" ? t.matchWinPlayer : t.matchWinAi}
+              </h2>
+              <p className="font-creep mb-2 text-xl text-amber-200/90">
+                {t.matchScore}: {score.player} — {score.ai}
+              </p>
+              <p className="mb-4 text-amber-200/80">
+                {matchWinner === "player" ? t.matchWinPrompt : t.matchLosePrompt}
+              </p>
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={newMatch}
+                  className="btn-spooky rounded-lg px-6 py-3 font-creep text-lg text-orange-300"
+                >
+                  {t.newMatch} →
                 </button>
                 <button
                   onClick={onExit}
@@ -788,6 +876,7 @@ function Board({
   hoverCol,
   interactive,
   winSet,
+  bonusWin,
   screamers,
   revealing,
   mowedCells,
@@ -798,6 +887,7 @@ function Board({
   hoverCol: number | null;
   interactive: boolean;
   winSet: Set<string> | null;
+  bonusWin: boolean;
   screamers: Screamer[];
   revealing: boolean;
   mowedCells: Set<string>;
@@ -837,13 +927,13 @@ function Board({
                   <UrnNiche isWin={isWin} revealing={revealing}>
                     {cell === 1 && (
                       <SkullHead
-                        className={`drop-in h-[86%] w-[86%] ${isWin ? "win-pulse" : ""}`}
+                        className={`drop-in h-[86%] w-[86%] ${isWin ? (bonusWin ? "win-pulse-bonus" : "win-pulse") : ""}`}
                         style={{ ["--drop-from" as string]: `-${(r + 1) * 90}px` }}
                       />
                     )}
                     {cell === 2 && (
                       <RottenSkullHead
-                        className={`drop-in floaty h-[86%] w-[86%] ${isWin ? "win-pulse" : ""}`}
+                        className={`drop-in floaty h-[86%] w-[86%] ${isWin ? (bonusWin ? "win-pulse-bonus" : "win-pulse") : ""}`}
                         style={{ ["--drop-from" as string]: `-${(r + 1) * 90}px` }}
                       />
                     )}

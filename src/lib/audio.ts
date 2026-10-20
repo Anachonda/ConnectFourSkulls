@@ -202,6 +202,13 @@ export function playReaper() {
   void audio.play().catch(() => {});
 }
 
+// Monster roar — plays on top of the win sound when a player gets 5+ in a row.
+export function playRoar() {
+  const audio = new Audio(`${import.meta.env.BASE_URL}Roar.mp3`);
+  audio.volume = 0.8;
+  void audio.play().catch(() => {});
+}
+
 // Occasional atmospheric scare effects — infrequent jump-scares.
 export function playThunder() {
   const audio = new Audio(`${import.meta.env.BASE_URL}Thunder.mp3`);

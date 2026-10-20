@@ -47,15 +47,20 @@ export function findWin(board: Board): WinInfo {
       const p = board[r][c];
       if (p === 0) continue;
       for (const [dr, dc] of DIRS) {
+        const prevR = r - dr;
+        const prevC = c - dc;
+        if (prevR >= 0 && prevR < ROWS && prevC >= 0 && prevC < COLS && board[prevR][prevC] === p) continue;
         const line: [number, number][] = [[r, c]];
-        for (let k = 1; k < 4; k++) {
+        let k = 1;
+        while (true) {
           const nr = r + dr * k;
           const nc = c + dc * k;
           if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) break;
           if (board[nr][nc] !== p) break;
           line.push([nr, nc]);
+          k++;
         }
-        if (line.length >= 4) return { player: p as Player, line: line.slice(0, 4) };
+        if (line.length >= 4) return { player: p as Player, line };
       }
     }
   }
