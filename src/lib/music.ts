@@ -8,7 +8,7 @@ export function useBackgroundMusic(on: boolean) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
-    const audio = new Audio("/Macabre_Waltz.mp3");
+    const audio = new Audio(`${import.meta.env.BASE_URL}Macabre_Waltz.mp3`);
     audio.loop = true;
     audio.volume = 0.4;
     audio.preload = "auto";
