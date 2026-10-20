@@ -1,5 +1,10 @@
 import { useEffect, useRef } from "react";
 
+// The background track is created in memory (not attached to the DOM), so
+// document.querySelector("audio") can't find it. Keep a module-level ref so
+// unlockMusic() can reach it from a user-gesture handler in another module.
+let bgAudio: HTMLAudioElement | null = null;
+
 // Plays the looping background track under both screens. The same <audio>
 // element persists across start/game screen transitions so the music doesn't
 // restart when navigating. Muting is controlled by the `on` flag and is also
@@ -13,10 +18,12 @@ export function useBackgroundMusic(on: boolean) {
     audio.volume = 0.4;
     audio.preload = "auto";
     audioRef.current = audio;
+    bgAudio = audio;
     return () => {
       audio.pause();
       audio.src = "";
       audioRef.current = null;
+      if (bgAudio === audio) bgAudio = null;
     };
   }, []);
 
@@ -26,7 +33,7 @@ export function useBackgroundMusic(on: boolean) {
     audio.muted = !on;
     if (on) {
       // Play only after a user gesture; browsers block autoplay otherwise.
-      // unlockAudio() is called from the toggle/start buttons in the UI.
+      // unlockMusic() is called from the toggle/start buttons in the UI.
       const p = audio.play();
       if (p && typeof p.catch === "function") {
         p.catch(() => {
@@ -41,8 +48,7 @@ export function useBackgroundMusic(on: boolean) {
 
 // Call from a user-gesture handler (button click) to unlock playback.
 export function unlockMusic() {
-  const audio = document.querySelector("audio");
-  if (audio && audio.paused) {
-    void audio.play().catch(() => {});
+  if (bgAudio && bgAudio.paused) {
+    void bgAudio.play().catch(() => {});
   }
 }

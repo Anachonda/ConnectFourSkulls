@@ -35,7 +35,7 @@ const CELL = 64; // px
 export default function App() {
   const [screen, setScreen] = useState<"start" | "game">("start");
   const [difficulty, setDifficulty] = useState<Difficulty>("normaal");
-  const [soundOn, setSoundOn] = useState(true);
+  const [soundOn, setSoundOn] = useState(false);
 
   useBackgroundMusic(soundOn);
 
