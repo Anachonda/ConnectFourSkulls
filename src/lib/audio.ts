@@ -187,3 +187,17 @@ export function playSwoosh() {
   noise.start(now);
   noise.stop(now + 0.65);
 }
+
+// Slow footsteps as the Grim Reaper enters the field.
+export function playFootsteps() {
+  const audio = new Audio(`${import.meta.env.BASE_URL}Footsteps.mp3`);
+  audio.volume = 0.55;
+  void audio.play().catch(() => {});
+}
+
+// Eerie scythe sound as the Grim Reaper slowly reaps.
+export function playReaper() {
+  const audio = new Audio(`${import.meta.env.BASE_URL}Reaper.mp3`);
+  audio.volume = 0.7;
+  void audio.play().catch(() => {});
+}

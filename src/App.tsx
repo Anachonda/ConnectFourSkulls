@@ -11,9 +11,12 @@ import {
   isFull,
   lowestEmptyRow,
   mowBottomRow,
+  reapSkulls,
 } from "@/lib/game";
 import {
+  playFootsteps,
   playLose,
+  playReaper,
   playScream,
   playSwoosh,
   playThump,
@@ -283,6 +286,7 @@ function GameScreen({
   const [revealing, setRevealing] = useState(false);
   const [revealWinner, setRevealWinner] = useState<Winner>(null);
   const [reaperActive, setReaperActive] = useState(false);
+  const [reaperMode, setReaperMode] = useState<"mow" | "reap">("mow");
   const [mowedCells, setMowedCells] = useState<Set<string>>(new Set());
 
   const screamId = useRef(0);
@@ -359,51 +363,80 @@ function GameScreen({
       moveCount.current += 1;
       setBoard(nextBoard);
 
-      if (moveCount.current % REAPER_EVERY === 0) {
-        const hasBottomPieces = nextBoard[5].some((v) => v !== 0);
-        if (hasBottomPieces) {
-          setReaperActive(true);
-          setBusy(true);
-          if (!muted) playSwoosh();
-          clearReaperTimer();
-          reaperTimer.current = window.setTimeout(() => {
-            const mowed = mowBottomRow(nextBoard);
-            const mowedSet = new Set(mowed.mowed.map(([r, c]) => `${r}-${c}`));
-            setMowedCells(mowedSet);
-            window.setTimeout(() => setMowedCells(new Set()), 650);
-            setBoard(mowed.board);
+      const turnMod = moveCount.current % REAPER_EVERY;
+      const doMow = turnMod === 0 && nextBoard[5].some((v) => v !== 0);
+      const doReap = !doMow && turnMod !== 0 && moveCount.current >= 5 && Math.random() < 0.18;
+
+      if (doMow || doReap) {
+        const mode: "mow" | "reap" = doMow ? "mow" : "reap";
+        const hasTargets =
+          mode === "mow"
+            ? nextBoard[5].some((v) => v !== 0)
+            : nextBoard.some((row) => row.some((v) => v === 1)) &&
+              nextBoard.some((row) => row.some((v) => v === 2));
+        if (!hasTargets) {
+          // Fallback: if the preferred mode has no targets, try the other.
+          const altMode: "mow" | "reap" = mode === "mow" ? "reap" : "mow";
+          const altTargets =
+            altMode === "mow"
+              ? nextBoard[5].some((v) => v !== 0)
+              : nextBoard.some((row) => row.some((v) => v === 1)) &&
+                nextBoard.some((row) => row.some((v) => v === 2));
+          if (!altTargets) {
             setShake(true);
             window.setTimeout(() => setShake(false), 420);
-
-            const postWin = findWin(mowed.board);
-            if (postWin) {
-              const who: Winner = postWin.player === 1 ? "player" : "ai";
-              setWinLine(postWin.line);
-              setRevealWinner(who);
-              setRevealing(true);
-              setScore((s) =>
-                who === "player"
-                  ? { ...s, player: s.player + 1 }
-                  : { ...s, ai: s.ai + 1 },
-              );
-              if (!muted) (who === "player" ? playWin() : playLose());
-              clearRevealTimer();
-              revealTimer.current = window.setTimeout(() => {
-                setWinner(who);
-                setRevealing(false);
-                setReaperActive(false);
-                setBusy(false);
-              }, 1200);
-              return;
-            }
-
-            setReaperActive(false);
             const next = (mover === 1 ? 2 : 1) as Player;
             setTurn(next);
             setBusy(false);
-          }, 1100);
-          return;
+            return;
+          }
+          setReaperMode(altMode);
+        } else {
+          setReaperMode(mode);
         }
+        const activeMode = hasTargets ? mode : (mode === "mow" ? "reap" : "mow");
+        setReaperActive(true);
+        setBusy(true);
+        if (!muted) playFootsteps();
+        clearReaperTimer();
+        reaperTimer.current = window.setTimeout(() => {
+          if (!muted) playReaper();
+          const result = activeMode === "mow" ? mowBottomRow(nextBoard) : reapSkulls(nextBoard);
+          const mowedSet = new Set(result.mowed.map(([r, c]) => `${r}-${c}`));
+          setMowedCells(mowedSet);
+          window.setTimeout(() => setMowedCells(new Set()), 650);
+          setBoard(result.board);
+          setShake(true);
+          window.setTimeout(() => setShake(false), 420);
+
+          const postWin = findWin(result.board);
+          if (postWin) {
+            const who: Winner = postWin.player === 1 ? "player" : "ai";
+            setWinLine(postWin.line);
+            setRevealWinner(who);
+            setRevealing(true);
+            setScore((s) =>
+              who === "player"
+                ? { ...s, player: s.player + 1 }
+                : { ...s, ai: s.ai + 1 },
+            );
+            if (!muted) (who === "player" ? playWin() : playLose());
+            clearRevealTimer();
+            revealTimer.current = window.setTimeout(() => {
+              setWinner(who);
+              setRevealing(false);
+              setReaperActive(false);
+              setBusy(false);
+            }, 1200);
+            return;
+          }
+
+          setReaperActive(false);
+          const next = (mover === 1 ? 2 : 1) as Player;
+          setTurn(next);
+          setBusy(false);
+        }, 2800);
+        return;
       }
 
       setShake(true);
@@ -490,6 +523,7 @@ function GameScreen({
     setRevealWinner(null);
     setRevealing(false);
     setReaperActive(false);
+    setReaperMode("mow");
     setMowedCells(new Set());
     setWinLine(null);
     setBusy(false);
@@ -572,9 +606,14 @@ function GameScreen({
 
       {/* Turn banner */}
       <div className="mb-3 h-7 text-center font-creep text-xl">
-        {reaperActive && (
+        {reaperActive && reaperMode === "mow" && (
           <span className="reveal-banner text-red-400">
             {t.reaperMows}
+          </span>
+        )}
+        {reaperActive && reaperMode === "reap" && (
+          <span className="reveal-banner text-red-400">
+            {t.reaperReaps}
           </span>
         )}
         {!reaperActive && revealing && revealWinner === "player" && (
