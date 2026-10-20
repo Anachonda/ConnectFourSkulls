@@ -36,7 +36,7 @@ type Winner = "player" | "ai" | "draw" | null;
 type WinLine = [number, number][] | null;
 
 const COLS_PX = 7;
-const CELL = 64; // px
+const CELL = 82; // px
 const MATCH_TARGET = 4;
 
 function bonusForLine(len: number): number {
@@ -90,7 +90,6 @@ export default function App() {
           <GameScreen
             difficulty={difficulty}
             soundOn={soundOn}
-            onToggleSound={toggleSound}
             onExit={() => setScreen("start")}
           />
         )}
@@ -274,12 +273,10 @@ function DifficultyOption({
 function GameScreen({
   difficulty,
   soundOn,
-  onToggleSound,
   onExit,
 }: {
   difficulty: Difficulty;
   soundOn: boolean;
-  onToggleSound: () => void;
   onExit: () => void;
 }) {
   const { t } = useLang();
@@ -611,11 +608,11 @@ function GameScreen({
         </p>
       </header>
 
-      <section className="mb-4 flex w-full max-w-2xl flex-wrap items-center justify-between gap-2 rounded-xl border border-purple-900/40 bg-black/40 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 backdrop-blur">
+      <section className="mb-3 flex w-full max-w-3xl items-center justify-center gap-2 rounded-xl border border-purple-900/40 bg-black/40 px-2 py-2 backdrop-blur sm:gap-4 sm:px-4 sm:py-3">
         <ScorePanel
           label={t.you}
           value={score.player}
-          badge={<SkullHead className="h-7 w-7" />}
+          badge={<SkullHead className="h-7 w-7 sm:h-8 sm:w-8" />}
           active={turn === 1 && !gameOver}
           accent="text-orange-400"
         />
@@ -629,39 +626,16 @@ function GameScreen({
         <ScorePanel
           label={t.ghost}
           value={score.ai}
-          badge={<RottenSkullHead className="h-7 w-7" />}
+          badge={<RottenSkullHead className="h-7 w-7 sm:h-8 sm:w-8" />}
           active={turn === 2 && !gameOver}
           accent="text-emerald-300"
         />
-
-        <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-          <button
-            onClick={onToggleSound}
-            className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
-            aria-label={soundOn ? t.soundOff : t.soundOn}
-            title={soundOn ? t.soundOff : t.soundOn}
-          >
-            {soundOn ? "🔊" : "🔇"}
-          </button>
-          <button
-            onClick={() => startRound(false)}
-            className="btn-spooky rounded-lg px-3 py-2 text-xs text-amber-100 sm:text-sm"
-          >
-            {t.newGame}
-          </button>
-          <button
-            onClick={newMatch}
-            className="btn-spooky rounded-lg px-3 py-2 text-xs text-amber-100 sm:text-sm"
-          >
-            {t.newMatch}
-          </button>
-          <button
-            onClick={onExit}
-            className="btn-spooky rounded-lg px-3 py-2 text-sm text-amber-100"
-          >
-            ← {t.menu}
-          </button>
-        </div>
+        <button
+          onClick={onExit}
+          className="btn-spooky ml-1 min-h-11 rounded-lg px-3 py-2 text-xs text-amber-100 sm:ml-2 sm:text-sm"
+        >
+          ← {t.menu}
+        </button>
       </section>
 
       <p className="mb-2 text-center text-sm text-amber-200/60">
@@ -822,17 +796,7 @@ function GameScreen({
         )}
       </div>
 
-      <section className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm text-amber-100/80">
-        <div className="flex items-center gap-2">
-          <SkullHead className="h-6 w-6" /> {t.youFreshSkull}
-        </div>
-        <div className="flex items-center gap-2">
-          <RottenSkullHead className="h-6 w-6" /> {t.ghostRottingHead}
-        </div>
-        <p className="basis-full text-center text-xs text-amber-200/60">
-          {t.legendHint}
-        </p>
-      </section>
+
     </>
   );
 }
@@ -893,13 +857,13 @@ function Board({
   mowedCells: Set<string>;
 }) {
   return (
-    <div className="urn-wall rounded-2xl p-3 sm:p-5">
+    <div className="urn-wall w-full max-w-[760px] rounded-2xl p-2 sm:p-4 md:p-5">
       <div className="urn-ledge mb-2 h-3 rounded-t" />
       <div className="relative">
         {interactive && hoverCol !== null && <PreviewPiece col={hoverCol} board={board} />}
 
         <div
-          className="grid gap-1 sm:gap-1.5"
+          className="grid gap-1 sm:gap-1.5 md:gap-2"
           style={{ gridTemplateColumns: `repeat(${COLS_PX}, minmax(0, 1fr))` }}
           onMouseLeave={() => onHoverCol(null)}
         >
@@ -980,7 +944,7 @@ function UrnNiche({
       className={`urn-niche relative flex items-center justify-center rounded-full ${
         isWin && revealing ? "win-ring" : ""
       }`}
-      style={{ width: CELL, height: CELL, maxWidth: "14vw", maxHeight: "14vw" }}
+      style={{ width: "clamp(50px, 12vw, 82px)", height: "clamp(50px, 12vw, 82px)" }}
     >
       <div className="absolute inset-0 rounded-full ring-2 ring-stone-900/80" />
       <div className="absolute inset-0 rounded-full ring-1 ring-stone-500/30" />
