@@ -282,6 +282,13 @@
 }
 .mow-fade { animation: mow-fade 0.6s ease-in forwards; }
 
+/* Pluck target highlight: own bottom skull pulses amber while in pluck mode */
+@keyframes pluck-target {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(251,191,36,0)); }
+  50% { transform: scale(1.08); filter: drop-shadow(0 0 10px rgba(251,191,36,0.85)); }
+}
+.pluck-target { animation: pluck-target 1s ease-in-out infinite; }
+
 /* Pieces falling down after the row is mowed */
 @keyframes fall-down {
   0% { transform: translateY(calc(var(--fall-distance, -70px))); }

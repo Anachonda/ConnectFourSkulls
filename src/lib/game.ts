@@ -195,6 +195,83 @@ export type Difficulty = "makkelijk" | "normaal" | "moeilijk";
 
 const DEPTH: Record<Difficulty, number> = { makkelijk: 1, normaal: 4, moeilijk: 6 };
 
+// Pluck a player's own bottom-most piece out of a column: remove it and let
+// the pieces above fall down (gravity within that column). Returns the removed
+// cell, or null if the player has no piece in that column.
+export function pluckOwnBottom(
+  board: Board,
+  col: number,
+  player: Player,
+): { board: Board; plucked: [number, number] } | null {
+  let target = -1;
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r][col] === player) {
+      target = r;
+      break;
+    }
+  }
+  if (target < 0) return null;
+  const next = board.map((row) => row.slice());
+  next[target][col] = 0;
+  for (let r = target; r > 0; r--) {
+    next[r][col] = next[r - 1][col];
+  }
+  next[0][col] = 0;
+  return { board: next, plucked: [target, col] };
+}
+
+// Columns in which `player` has at least one of their own pieces (pluckable).
+export function pluckableCols(board: Board, player: Player): number[] {
+  const out: number[] = [];
+  for (let c = 0; c < COLS; c++) {
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (board[r][c] === player) {
+        out.push(c);
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+// Lowest row index of `player`'s piece in `col`, or -1.
+export function lowestOwnRow(board: Board, col: number, player: Player): number {
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r][col] === player) return r;
+  }
+  return -1;
+}
+
+// Should the AI pluck one of its own pieces now? Pluck if it produces an
+// immediate win, or if it dismantles an opponent's immediate winning drop.
+export function shouldAiPluck(board: Board, ai: Player): { col: number } | null {
+  const human = (ai === 1 ? 2 : 1) as Player;
+
+  // 1) Win now.
+  for (const c of pluckableCols(board, ai)) {
+    const res = pluckOwnBottom(board, c, ai);
+    if (res && findWin(res.board)?.player === ai) return { col: c };
+  }
+
+  // 2) Block: human has an immediate winning drop; see if a pluck removes it.
+  const humanWins = validCols(board)
+    .map((c) => drop(board, c, human))
+    .filter((d): d is { board: Board; row: number } => !!d)
+    .some((d) => findWin(d.board)?.player === human);
+  if (humanWins) {
+    for (const c of pluckableCols(board, ai)) {
+      const res = pluckOwnBottom(board, c, ai);
+      if (!res) continue;
+      const stillWins = validCols(res.board)
+        .map((cc) => drop(res.board, cc, human))
+        .filter((d): d is { board: Board; row: number } => !!d)
+        .some((d) => findWin(d.board)?.player === human);
+      if (!stillWins) return { col: c };
+    }
+  }
+  return null;
+}
+
 // Should the AI spend its one-per-round mow now? It should if mowing gives
 // it an immediate win, or blocks an opponent's immediate winning threat by
 // removing the bottom row (e.g. the opponent has three lined up on row 5).

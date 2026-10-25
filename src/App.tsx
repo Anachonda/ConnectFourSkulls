@@ -10,8 +10,12 @@ import {
   findWin,
   isFull,
   lowestEmptyRow,
+  lowestOwnRow,
   mowBottomRow,
+  pluckableCols,
+  pluckOwnBottom,
   shouldAiMow,
+  shouldAiPluck,
 } from "@/lib/game";
 import {
   playFootsteps,
@@ -328,6 +332,8 @@ function GameScreen({
   const [reaperActive, setReaperActive] = useState(false);
   const [mowedCells, setMowedCells] = useState<Set<string>>(new Set());
   const [mowUsed, setMowUsed] = useState<{ player: boolean; ai: boolean }>({ player: false, ai: false });
+  const [pluckMode, setPluckMode] = useState(false);
+  const [pluckBanner, setPluckBanner] = useState<null | "player" | "ai" | "draw">(null);
   const [lastWinLength, setLastWinLength] = useState(0);
   const [matchOver, setMatchOver] = useState(false);
   const [matchWinner, setMatchWinner] = useState<Winner>(null);
@@ -426,6 +432,50 @@ function GameScreen({
     [muted, clearRevealTimer],
   );
 
+  // Shared handling for when a win/draw arises from a board transformation
+  // (pluck or mow) where BOTH players might simultaneously have a line. Calls
+  // resolveResult for the single-winner case, or resolves a draw inline.
+  const resolveTransform = useCallback(
+    (nextBoard: Board) => {
+      const win = findWin(nextBoard);
+      if (win) {
+        const other = (win.player === 1 ? 2 : 1) as Player;
+        if (hasLineFor(nextBoard, other)) {
+          setBoard(nextBoard);
+          setWinLine(win.line);
+          setLastWinLength(win.line.length);
+          setRevealWinner("draw");
+          setRevealing(true);
+          let matchDone = false;
+          let mw: Winner = null;
+          setScore((s) => {
+            const ns = { ...s, player: s.player + 1, ai: s.ai + 1, draws: s.draws };
+            if (ns.player >= MATCH_TARGET && ns.ai >= MATCH_TARGET) { matchDone = true; mw = null; }
+            else if (ns.player >= MATCH_TARGET) { matchDone = true; mw = "player"; }
+            else if (ns.ai >= MATCH_TARGET) { matchDone = true; mw = "ai"; }
+            return ns;
+          });
+          if (!muted) playRoar();
+          setShake(true);
+          window.setTimeout(() => setShake(false), 420);
+          clearRevealTimer();
+          revealTimer.current = window.setTimeout(() => {
+            setWinner("draw");
+            setRevealing(false);
+            setBusy(false);
+            if (matchDone && mw) {
+              setMatchWinner(mw);
+              setMatchOver(true);
+            }
+          }, 1200);
+          return;
+        }
+      }
+      resolveResult(nextBoard, win?.line ?? null, true);
+    },
+    [resolveResult, muted, clearRevealTimer],
+  );
+
   const finishMove = useCallback(
     (nextBoard: Board, _movedRow: number, _movedCol: number, mover: Player) => {
       const win = findWin(nextBoard);
@@ -459,55 +509,15 @@ function GameScreen({
           setMowedCells(mowedSet);
           window.setTimeout(() => setMowedCells(new Set()), 650);
 
-          // After mowing, check for wins for BOTH players simultaneously.
-          const win = findWin(result.board);
-          if (win) {
-            // A single findWin returns the first line; check if the other
-            // player also has a line on the resulting board by scanning.
-            const other = (win.player === 1 ? 2 : 1) as Player;
-            const otherWin = hasLineFor(result.board, other);
-            if (otherWin) {
-              // Both formed a row: draw, each gets a point.
-              setBoard(result.board);
-              setWinLine(win.line);
-              setLastWinLength(win.line.length);
-              setRevealWinner("draw");
-              setRevealing(true);
-              let matchDone = false;
-              let mw: Winner = null;
-              setScore((s) => {
-                const ns = { ...s, player: s.player + 1, ai: s.ai + 1, draws: s.draws };
-                if (ns.player >= MATCH_TARGET && ns.ai >= MATCH_TARGET) { matchDone = true; mw = null; }
-                else if (ns.player >= MATCH_TARGET) { matchDone = true; mw = "player"; }
-                else if (ns.ai >= MATCH_TARGET) { matchDone = true; mw = "ai"; }
-                return ns;
-              });
-              if (!muted) playRoar();
-              setShake(true);
-              window.setTimeout(() => setShake(false), 420);
-              clearRevealTimer();
-              revealTimer.current = window.setTimeout(() => {
-                setWinner("draw");
-                setRevealing(false);
-                setBusy(false);
-                setReaperActive(false);
-                if (matchDone && mw) {
-                  setMatchWinner(mw);
-                  setMatchOver(true);
-                }
-              }, 1200);
-              return;
-            }
-          }
-
           setShake(true);
           window.setTimeout(() => setShake(false), 420);
           setReaperActive(false);
           setMowUsed((u) => (mover === 1 ? { ...u, player: true } : { ...u, ai: true }));
 
-          const winLine = win?.line ?? null;
-          if (winLine || isFull(result.board)) {
-            resolveResult(result.board, winLine, true);
+          const win = findWin(result.board);
+          const full = isFull(result.board);
+          if (win || full) {
+            resolveTransform(result.board);
             return;
           }
           setBoard(result.board);
@@ -517,19 +527,69 @@ function GameScreen({
         }, 500);
       }, 3600);
     },
-    [board, muted, clearReaperTimer, resolveResult],
+    [board, muted, clearReaperTimer, resolveTransform],
+  );
+
+  // Player or AI plucks their own bottom skull from `col`. Costs the turn.
+  const performPluck = useCallback(
+    (mover: Player, col: number) => {
+      const result = pluckOwnBottom(board, col, mover);
+      if (!result) return;
+      setBusy(true);
+      setPluckBanner(mover === 1 ? "player" : "ai");
+      if (!muted) playScream(mover === 1 ? "pumpkin" : "ghost");
+      const [pr, pc] = result.plucked;
+      addScreamer(pc, pr, mover === 1 ? "skull" : "rotten");
+
+      window.setTimeout(() => {
+        const mowedSet = new Set([`${pr}-${pc}`]);
+        setMowedCells(mowedSet);
+        window.setTimeout(() => setMowedCells(new Set()), 650);
+        if (!muted) playThump();
+
+        setShake(true);
+        window.setTimeout(() => setShake(false), 420);
+        setPluckBanner(null);
+
+        const win = findWin(result.board);
+        const full = isFull(result.board);
+        if (win || full) {
+          resolveTransform(result.board);
+          return;
+        }
+        setBoard(result.board);
+        const next = (mover === 1 ? 2 : 1) as Player;
+        setTurn(next);
+        setBusy(false);
+      }, 520);
+    },
+    [board, muted, addScreamer, resolveTransform],
+  );
+
+  const handlePluck = useCallback(
+    (col: number) => {
+      if (gameOver || busy || turn !== 1) return;
+      const r = lowestOwnRow(board, col, 1);
+      if (r < 0) return;
+      unlockAudio();
+      setPluckMode(false);
+      performPluck(1, col);
+    },
+    [board, busy, gameOver, turn, performPluck],
   );
 
   const handleMow = useCallback(() => {
     if (gameOver || busy || turn !== 1 || mowUsed.player) return;
     if (!board[5].some((v) => v !== 0)) return;
     unlockAudio();
+    setPluckMode(false);
     performMow(1);
   }, [board, busy, gameOver, turn, mowUsed.player, performMow]);
 
   const handleDrop = useCallback(
     (col: number) => {
       if (gameOver || busy || turn !== 1) return;
+      if (pluckMode) return;
       const row = lowestEmptyRow(board, col);
       if (row < 0) return;
       unlockAudio();
@@ -543,7 +603,7 @@ function GameScreen({
         finishMove(res.board, row, col, 1);
       }, 420);
     },
-    [board, busy, gameOver, turn, muted, addScreamer, finishMove],
+    [board, busy, gameOver, turn, muted, addScreamer, finishMove, pluckMode],
   );
 
   useEffect(() => {
@@ -559,6 +619,13 @@ function GameScreen({
       // The AI may spend its one-per-round mow if it's advantageous.
       if (!mowUsed.ai && shouldAiMow(board, 2)) {
         performMow(2);
+        aiPending.current = false;
+        return;
+      }
+      // The AI may pluck one of its own pieces for a win or to block.
+      const pluck = shouldAiPluck(board, 2);
+      if (pluck) {
+        performPluck(2, pluck.col);
         aiPending.current = false;
         return;
       }
@@ -591,7 +658,7 @@ function GameScreen({
       }
       aiPending.current = false;
     };
-  }, [turn, gameOver, revealing, reaperActive, board, difficulty, muted, addScreamer, finishMove, mowUsed.ai, performMow]);
+  }, [turn, gameOver, revealing, reaperActive, board, difficulty, muted, addScreamer, finishMove, mowUsed.ai, performMow, performPluck]);
 
   // Occasional atmospheric scare sounds — self-rescheduling, independent of moves.
   useEffect(() => {
@@ -644,6 +711,8 @@ function GameScreen({
       setReaperActive(false);
       setMowedCells(new Set());
       setMowUsed({ player: false, ai: false });
+      setPluckMode(false);
+      setPluckBanner(null);
       setWinLine(null);
       setBusy(false);
       setScreamers([]);
@@ -711,8 +780,8 @@ function GameScreen({
         {t.matchTarget}
       </p>
 
-      {/* Scythe mow button — one use per player per round */}
-      <div className="mb-3 flex items-center justify-center gap-3">
+      {/* Action buttons: mow (once/round) and pluck own skull (every turn) */}
+      <div className="mb-3 flex flex-wrap items-center justify-center gap-3">
         <MowButton
           label={t.mowLabel}
           usedLabel={t.mowUsed}
@@ -729,6 +798,22 @@ function GameScreen({
           onClick={() => {}}
           accent="emerald"
         />
+        <PluckButton
+          label={t.pluckLabel}
+          activeLabel={t.pluckCancel}
+          active={pluckMode}
+          disabled={gameOver || revealing || reaperActive || busy || turn !== 1 || pluckableCols(board, 1).length === 0}
+          onClick={() => setPluckMode((p) => !p)}
+          accent="orange"
+        />
+        <PluckButton
+          label={t.pluckLabel}
+          activeLabel={t.pluckActive}
+          active={false}
+          disabled
+          onClick={() => {}}
+          accent="emerald"
+        />
       </div>
 
       {/* Turn banner */}
@@ -738,7 +823,13 @@ function GameScreen({
             {t.reaperMows}
           </span>
         )}
-        {!reaperActive && revealing && revealWinner === "player" && (
+        {!reaperActive && pluckBanner === "player" && (
+          <span className="reveal-banner text-orange-400">{t.pluckBanner}</span>
+        )}
+        {!reaperActive && pluckBanner === "ai" && (
+          <span className="reveal-banner text-emerald-300">{t.aiPluckBanner}</span>
+        )}
+        {!reaperActive && !pluckBanner && revealing && revealWinner === "player" && (
           <span className="reveal-banner text-orange-400">
             {lastWinLength >= 6 ? t.revealPlayerSix : lastWinLength === 5 ? t.revealPlayerFive : t.revealPlayer}
           </span>
@@ -773,8 +864,11 @@ function GameScreen({
           board={board}
           onHoverCol={setHoverCol}
           onPickCol={handleDrop}
+          onPickPluck={handlePluck}
           hoverCol={hoverCol}
           interactive={!gameOver && !revealing && !reaperActive && turn === 1 && !busy}
+          pluckMode={pluckMode}
+          pluckableCols={pluckableCols(board, 1)}
           winSet={winSet}
           bonusWin={bonusWin}
           screamers={screamers}
@@ -921,8 +1015,11 @@ function Board({
   board,
   onHoverCol,
   onPickCol,
+  onPickPluck,
   hoverCol,
   interactive,
+  pluckMode,
+  pluckableCols,
   winSet,
   bonusWin,
   screamers,
@@ -932,19 +1029,37 @@ function Board({
   board: Board;
   onHoverCol: (c: number | null) => void;
   onPickCol: (c: number) => void;
+  onPickPluck: (c: number) => void;
   hoverCol: number | null;
   interactive: boolean;
+  pluckMode: boolean;
+  pluckableCols: number[];
   winSet: Set<string> | null;
   bonusWin: boolean;
   screamers: Screamer[];
   revealing: boolean;
   mowedCells: Set<string>;
 }) {
+  const pluckSet = useMemo(() => new Set(pluckableCols), [pluckableCols]);
+  // Highlight target cell per pluckable column = player's lowest own piece.
+  const pluckTargets = useMemo(() => {
+    const m = new Map<number, number>();
+    if (!pluckMode) return m;
+    for (const c of pluckableCols) {
+      for (let r = board.length - 1; r >= 0; r--) {
+        if (board[r][c] === 1) {
+          m.set(c, r);
+          break;
+        }
+      }
+    }
+    return m;
+  }, [board, pluckableCols, pluckMode]);
   return (
     <div className="urn-wall w-full max-w-[760px] rounded-2xl p-2 sm:p-4 md:p-5">
       <div className="urn-ledge mb-2 h-3 rounded-t" />
       <div className="relative">
-        {interactive && hoverCol !== null && <PreviewPiece col={hoverCol} board={board} />}
+        {interactive && !pluckMode && hoverCol !== null && <PreviewPiece col={hoverCol} board={board} />}
 
         <div
           className="grid gap-1 sm:gap-1.5 md:gap-2"
@@ -957,25 +1072,39 @@ function Board({
               const isWin = winSet?.has(key) ?? false;
               const screamer = screamers.find((s) => s.col === c && s.row === r);
               const mowed = mowedCells.has(key);
+              const isPluckTarget = pluckMode && pluckTargets.get(c) === r;
+              const colPluckable = pluckSet.has(c);
               return (
                 <div
                   key={key}
                   className="col-hover relative"
                   onMouseEnter={() => onHoverCol(c)}
-                  onClick={() => interactive && onPickCol(c)}
-                  style={{ cursor: interactive ? "pointer" : "default" }}
+                  onClick={() => {
+                    if (!interactive) return;
+                    if (pluckMode) {
+                      if (colPluckable) onPickPluck(c);
+                    } else {
+                      onPickCol(c);
+                    }
+                  }}
+                  style={{
+                    cursor: interactive ? (pluckMode ? (colPluckable ? "pointer" : "not-allowed") : "pointer") : "default",
+                  }}
                 >
                   <div
                     className="col-glow pointer-events-none absolute inset-x-0 -inset-y-2 rounded"
                     style={{
-                      background:
-                        "linear-gradient(180deg, rgba(255,140,0,0.10) 0%, rgba(255,140,0,0) 100%)",
+                      background: pluckMode
+                        ? colPluckable
+                          ? "linear-gradient(180deg, rgba(255,200,40,0.16) 0%, rgba(255,200,40,0) 100%)"
+                          : "linear-gradient(180deg, rgba(120,120,120,0.08) 0%, rgba(120,120,120,0) 100%)"
+                        : "linear-gradient(180deg, rgba(255,140,0,0.10) 0%, rgba(255,140,0,0) 100%)",
                     }}
                   />
                   <UrnNiche isWin={isWin} revealing={revealing}>
                     {cell === 1 && (
                       <SkullHead
-                        className={`drop-in h-[86%] w-[86%] ${isWin ? (bonusWin ? "win-pulse-bonus" : "win-pulse") : ""}`}
+                        className={`drop-in h-[86%] w-[86%] ${isWin ? (bonusWin ? "win-pulse-bonus" : "win-pulse") : ""} ${isPluckTarget ? "pluck-target" : ""}`}
                         style={{ ["--drop-from" as string]: `-${(r + 1) * 90}px` }}
                       />
                     )}
@@ -1110,6 +1239,61 @@ function ScytheIcon({ className }: { className?: string }) {
       />
       <path d="M4 15 L7 18 L4 21 Z" fill="currentColor" opacity="0.7" />
       <line x1="5" y1="16" x2="18" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/* ---------------- Pluck own skull button ---------------- */
+
+function PluckButton({
+  label,
+  activeLabel,
+  active,
+  disabled,
+  onClick,
+  accent,
+}: {
+  label: string;
+  activeLabel: string;
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  accent: "orange" | "emerald";
+}) {
+  const accentRing =
+    accent === "orange"
+      ? "border-orange-500/70 hover:bg-orange-500/15 text-orange-300 shadow-[0_0_18px_rgba(255,120,0,0.22)]"
+      : "border-emerald-500/60 text-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.18)]";
+  const activeCls = "border-amber-400/80 bg-amber-500/20 text-amber-200 shadow-[0_0_22px_rgba(251,191,36,0.4)]";
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled && !active}
+      aria-label={label}
+      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-creep transition-all ${
+        disabled && !active
+          ? "border-purple-900/40 bg-black/30 text-amber-200/40"
+          : active
+            ? activeCls
+            : `${accentRing} bg-black/40 hover:scale-[1.03]`
+      }`}
+    >
+      <HandIcon className="h-6 w-6" />
+      <span className="whitespace-nowrap">{active ? activeLabel : label}</span>
+    </button>
+  );
+}
+
+function HandIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="none">
+      <path
+        d="M9 11V5.5a1.5 1.5 0 0 1 3 0V11m0-1V4.5a1.5 1.5 0 0 1 3 0V11m0-.5V6a1.5 1.5 0 0 1 3 0v6c0 3.5-2.4 6-6 6s-5.2-1.4-6.2-3.4L5 13.2a1.4 1.4 0 0 1 .5-1.9 1.5 1.5 0 0 1 1.9.2L9 13"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
