@@ -25,7 +25,6 @@ export const STRINGS = {
     reset: "Reset",
     menu: "Menu",
     reaperMows: "Magere Hein maait de onderste rij weg!",
-    reaperReaps: "Magere Hein haalt van elke speler een doodshoofd weg!",
     revealPlayer: "Vier op een rij! De hoofden juichen...",
     revealAi: "Het spook vormt een rij... het lacht.",
     revealDraw: "De begraafplaats is vol...",
@@ -57,9 +56,12 @@ export const STRINGS = {
     youFreshSkull: "Jij — vers doodshoofd",
     ghostRottingHead: "Spook — verrot hoof",
     legendHint:
-      "Klik op een urn om een hoofd in het graf te laten vallen. Vier op een rij wint het potje — vijf of meer levert bonuspunten op! Eerst tot 4 punten wint de match. Let op: om de 10 zetten maait Magere Hein de onderste rij weg!",
+      "Klik op een urn om een hoofd in het graf te laten vallen. Vier op een rij wint het potje — vijf of meer levert bonuspunten op! Eerst tot 4 punten wint de match. Elke speler mag één keer per potje Magere Hein oproepen: klik op de zeis om de onderste rij weg te maaien. Dat telt als je beurt.",
     graveHere: "HIER",
     graveDead: "DOOD",
+    mowLabel: "Maaien",
+    mowUsed: "Gebruikt",
+    reaperDraw: "Magere Hein maait en beiden maken een rij — gelijkspel!",
   },
   en: {
     title: "Connect Four Skulls",
@@ -83,7 +85,6 @@ export const STRINGS = {
     reset: "Reset",
     menu: "Menu",
     reaperMows: "The Grim Reaper mows away the bottom row!",
-    reaperReaps: "The Grim Reaper takes a skull from each player!",
     revealPlayer: "Four in a row! The heads rejoice...",
     revealAi: "The ghost forms a row... it laughs.",
     revealDraw: "The graveyard is full...",
@@ -115,9 +116,12 @@ export const STRINGS = {
     youFreshSkull: "You — fresh skull",
     ghostRottingHead: "Ghost — rotting head",
     legendHint:
-      "Click an urn to drop a head into the grave. Four in a row wins the round — five or more earns bonus points! First to 4 points wins the match. Watch out: every 10 turns the Grim Reaper mows away the bottom row!",
+      "Click an urn to drop a head into the grave. Four in a row wins the round — five or more earns bonus points! First to 4 points wins the match. Each player may summon the Grim Reaper once per round: click the scythe to mow away the bottom row. That counts as your turn.",
     graveHere: "HERE",
     graveDead: "DEAD",
+    mowLabel: "Mow",
+    mowUsed: "Used",
+    reaperDraw: "The Reaper mows and both form a row — it's a draw!",
   },
 } as const;
 

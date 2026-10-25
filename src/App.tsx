@@ -11,7 +11,7 @@ import {
   isFull,
   lowestEmptyRow,
   mowBottomRow,
-  reapSkulls,
+  shouldAiMow,
 } from "@/lib/game";
 import {
   playFootsteps,
@@ -20,7 +20,6 @@ import {
   playReaper,
   playRoar,
   playScream,
-  playSwoosh,
   playThump,
   playWin,
   randomScream,
@@ -43,6 +42,41 @@ function bonusForLine(len: number): number {
   if (len >= 6) return 3;
   if (len === 5) return 2;
   return 1;
+}
+
+// Detect whether `player` has any 4-in-a-row line on the board (independent
+// of findWin, which only returns the first line for whichever player).
+const CHECK_DIRS: [number, number][] = [
+  [0, 1],
+  [1, 0],
+  [1, 1],
+  [1, -1],
+];
+
+function hasLineFor(board: Board, player: Player): boolean {
+  for (let r = 0; r < board.length; r++) {
+    for (let c = 0; c < board[0].length; c++) {
+      if (board[r][c] !== player) continue;
+      for (const [dr, dc] of CHECK_DIRS) {
+        let count = 1;
+        let nr = r + dr;
+        let nc = c + dc;
+        while (
+          nr >= 0 &&
+          nr < board.length &&
+          nc >= 0 &&
+          nc < board[0].length &&
+          board[nr][nc] === player
+        ) {
+          count++;
+          if (count >= 4) return true;
+          nr += dr;
+          nc += dc;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 export default function App() {
@@ -292,8 +326,8 @@ function GameScreen({
   const [revealing, setRevealing] = useState(false);
   const [revealWinner, setRevealWinner] = useState<Winner>(null);
   const [reaperActive, setReaperActive] = useState(false);
-  const [reaperMode, setReaperMode] = useState<"mow" | "reap">("mow");
   const [mowedCells, setMowedCells] = useState<Set<string>>(new Set());
+  const [mowUsed, setMowUsed] = useState<{ player: boolean; ai: boolean }>({ player: false, ai: false });
   const [lastWinLength, setLastWinLength] = useState(0);
   const [matchOver, setMatchOver] = useState(false);
   const [matchWinner, setMatchWinner] = useState<Winner>(null);
@@ -309,7 +343,6 @@ function GameScreen({
 
   const muted = !soundOn;
   const gameOver = winner !== null;
-  const REAPER_EVERY = 10;
 
   const clearRevealTimer = useCallback(() => {
     if (revealTimer.current) {
@@ -334,15 +367,16 @@ function GameScreen({
     }, 1400);
   }, []);
 
-  const finishMove = useCallback(
-    (nextBoard: Board, _movedRow: number, _movedCol: number, mover: Player) => {
-      const win = findWin(nextBoard);
-      if (win) {
+  // Resolve a win/draw after a mow or a drop. `winByMow` indicates the win
+  // was produced by mowing (so a simultaneous win for both players is a draw).
+  const resolveResult = useCallback(
+    (nextBoard: Board, winLine: [number, number][] | null, byMow: boolean) => {
+      if (winLine) {
         setBoard(nextBoard);
-        setWinLine(win.line);
-        const who: Winner = win.player === 1 ? "player" : "ai";
-        const winLen = win.line.length;
+        setWinLine(winLine);
+        const winLen = winLine.length;
         setLastWinLength(winLen);
+        const who: Winner = winLine[0] && nextBoard[winLine[0][0]][winLine[0][1]] === 1 ? "player" : "ai";
         setRevealWinner(who);
         setRevealing(true);
         const pts = bonusForLine(winLen);
@@ -387,82 +421,111 @@ function GameScreen({
         }, 1200);
         return;
       }
-
-      moveCount.current += 1;
       setBoard(nextBoard);
+    },
+    [muted, clearRevealTimer],
+  );
 
-      const turnMod = moveCount.current % REAPER_EVERY;
-      const doMow = turnMod === 0 && nextBoard[5].some((v) => v !== 0);
-      const doReap = !doMow && turnMod !== 0 && moveCount.current >= 5 && Math.random() < 0.08;
-
-      if (doMow || doReap) {
-        const mode: "mow" | "reap" = doMow ? "mow" : "reap";
-        const hasTargets =
-          mode === "mow"
-            ? nextBoard[5].some((v) => v !== 0)
-            : nextBoard.some((row) => row.some((v) => v === 1)) &&
-              nextBoard.some((row) => row.some((v) => v === 2));
-        if (!hasTargets) {
-          // Fallback: if the preferred mode has no targets, try the other.
-          const altMode: "mow" | "reap" = mode === "mow" ? "reap" : "mow";
-          const altTargets =
-            altMode === "mow"
-              ? nextBoard[5].some((v) => v !== 0)
-              : nextBoard.some((row) => row.some((v) => v === 1)) &&
-                nextBoard.some((row) => row.some((v) => v === 2));
-          if (!altTargets) {
-            setShake(true);
-            window.setTimeout(() => setShake(false), 420);
-            const next = (mover === 1 ? 2 : 1) as Player;
-            setTurn(next);
-            setBusy(false);
-            return;
-          }
-          setReaperMode(altMode);
-        } else {
-          setReaperMode(mode);
-        }
-        const activeMode = hasTargets ? mode : (mode === "mow" ? "reap" : "mow");
-        const result = activeMode === "mow" ? mowBottomRow(nextBoard) : reapSkulls(nextBoard);
-        if (findWin(result.board)) {
-          setShake(true);
-          window.setTimeout(() => setShake(false), 420);
-          const next = (mover === 1 ? 2 : 1) as Player;
-          setTurn(next);
-          setBusy(false);
-          return;
-        }
-        setReaperActive(true);
-        setBusy(true);
-        if (!muted) playFootsteps();
-        clearReaperTimer();
-        reaperTimer.current = window.setTimeout(() => {
-          if (!muted) playReaper();
-          reaperTimer.current = window.setTimeout(() => {
-            const mowedSet = new Set(result.mowed.map(([r, c]) => `${r}-${c}`));
-            setMowedCells(mowedSet);
-            window.setTimeout(() => setMowedCells(new Set()), 650);
-            setBoard(result.board);
-          setShake(true);
-          window.setTimeout(() => setShake(false), 420);
-
-            setReaperActive(false);
-            const next = (mover === 1 ? 2 : 1) as Player;
-            setTurn(next);
-            setBusy(false);
-          }, 500);
-        }, 3600);
+  const finishMove = useCallback(
+    (nextBoard: Board, _movedRow: number, _movedCol: number, mover: Player) => {
+      const win = findWin(nextBoard);
+      if (win || isFull(nextBoard)) {
+        resolveResult(nextBoard, win?.line ?? null, false);
         return;
       }
-
+      moveCount.current += 1;
       setShake(true);
       window.setTimeout(() => setShake(false), 420);
       const next = (mover === 1 ? 2 : 1) as Player;
+      setBoard(nextBoard);
       setTurn(next);
       setBusy(false);
     },
-    [muted, clearRevealTimer, clearReaperTimer],
+    [resolveResult],
   );
+
+  // Player or AI spends their one-per-round mow. `mover` is who is mowing.
+  const performMow = useCallback(
+    (mover: Player) => {
+      const result = mowBottomRow(board);
+      setReaperActive(true);
+      setBusy(true);
+      if (!muted) playFootsteps();
+      clearReaperTimer();
+      reaperTimer.current = window.setTimeout(() => {
+        if (!muted) playReaper();
+        reaperTimer.current = window.setTimeout(() => {
+          const mowedSet = new Set(result.mowed.map(([r, c]) => `${r}-${c}`));
+          setMowedCells(mowedSet);
+          window.setTimeout(() => setMowedCells(new Set()), 650);
+
+          // After mowing, check for wins for BOTH players simultaneously.
+          const win = findWin(result.board);
+          if (win) {
+            // A single findWin returns the first line; check if the other
+            // player also has a line on the resulting board by scanning.
+            const other = (win.player === 1 ? 2 : 1) as Player;
+            const otherWin = hasLineFor(result.board, other);
+            if (otherWin) {
+              // Both formed a row: draw, each gets a point.
+              setBoard(result.board);
+              setWinLine(win.line);
+              setLastWinLength(win.line.length);
+              setRevealWinner("draw");
+              setRevealing(true);
+              let matchDone = false;
+              let mw: Winner = null;
+              setScore((s) => {
+                const ns = { ...s, player: s.player + 1, ai: s.ai + 1, draws: s.draws };
+                if (ns.player >= MATCH_TARGET && ns.ai >= MATCH_TARGET) { matchDone = true; mw = null; }
+                else if (ns.player >= MATCH_TARGET) { matchDone = true; mw = "player"; }
+                else if (ns.ai >= MATCH_TARGET) { matchDone = true; mw = "ai"; }
+                return ns;
+              });
+              if (!muted) playRoar();
+              setShake(true);
+              window.setTimeout(() => setShake(false), 420);
+              clearRevealTimer();
+              revealTimer.current = window.setTimeout(() => {
+                setWinner("draw");
+                setRevealing(false);
+                setBusy(false);
+                setReaperActive(false);
+                if (matchDone && mw) {
+                  setMatchWinner(mw);
+                  setMatchOver(true);
+                }
+              }, 1200);
+              return;
+            }
+          }
+
+          setShake(true);
+          window.setTimeout(() => setShake(false), 420);
+          setReaperActive(false);
+          setMowUsed((u) => (mover === 1 ? { ...u, player: true } : { ...u, ai: true }));
+
+          const winLine = win?.line ?? null;
+          if (winLine || isFull(result.board)) {
+            resolveResult(result.board, winLine, true);
+            return;
+          }
+          setBoard(result.board);
+          const next = (mover === 1 ? 2 : 1) as Player;
+          setTurn(next);
+          setBusy(false);
+        }, 500);
+      }, 3600);
+    },
+    [board, muted, clearReaperTimer, resolveResult],
+  );
+
+  const handleMow = useCallback(() => {
+    if (gameOver || busy || turn !== 1 || mowUsed.player) return;
+    if (!board[5].some((v) => v !== 0)) return;
+    unlockAudio();
+    performMow(1);
+  }, [board, busy, gameOver, turn, mowUsed.player, performMow]);
 
   const handleDrop = useCallback(
     (col: number) => {
@@ -493,6 +556,12 @@ function GameScreen({
     setBusy(true);
 
     aiTimer.current = window.setTimeout(() => {
+      // The AI may spend its one-per-round mow if it's advantageous.
+      if (!mowUsed.ai && shouldAiMow(board, 2)) {
+        performMow(2);
+        aiPending.current = false;
+        return;
+      }
       const col = chooseAiMove(board, 2, difficulty);
       if (col < 0) {
         aiPending.current = false;
@@ -522,7 +591,7 @@ function GameScreen({
       }
       aiPending.current = false;
     };
-  }, [turn, gameOver, revealing, reaperActive, board, difficulty, muted, addScreamer, finishMove]);
+  }, [turn, gameOver, revealing, reaperActive, board, difficulty, muted, addScreamer, finishMove, mowUsed.ai, performMow]);
 
   // Occasional atmospheric scare sounds — self-rescheduling, independent of moves.
   useEffect(() => {
@@ -573,8 +642,8 @@ function GameScreen({
       setRevealWinner(null);
       setRevealing(false);
       setReaperActive(false);
-      setReaperMode("mow");
       setMowedCells(new Set());
+      setMowUsed({ player: false, ai: false });
       setWinLine(null);
       setBusy(false);
       setScreamers([]);
@@ -642,16 +711,31 @@ function GameScreen({
         {t.matchTarget}
       </p>
 
+      {/* Scythe mow button — one use per player per round */}
+      <div className="mb-3 flex items-center justify-center gap-3">
+        <MowButton
+          label={t.mowLabel}
+          usedLabel={t.mowUsed}
+          used={mowUsed.player}
+          disabled={gameOver || revealing || reaperActive || busy || turn !== 1 || !board[5].some((v) => v !== 0)}
+          onClick={handleMow}
+          accent="orange"
+        />
+        <MowButton
+          label={t.mowLabel}
+          usedLabel={t.mowUsed}
+          used={mowUsed.ai}
+          disabled
+          onClick={() => {}}
+          accent="emerald"
+        />
+      </div>
+
       {/* Turn banner */}
       <div className="mb-3 h-7 text-center font-creep text-xl">
-        {reaperActive && reaperMode === "mow" && (
+        {reaperActive && (
           <span className="reveal-banner text-red-400">
             {t.reaperMows}
-          </span>
-        )}
-        {reaperActive && reaperMode === "reap" && (
-          <span className="reveal-banner text-red-400">
-            {t.reaperReaps}
           </span>
         )}
         {!reaperActive && revealing && revealWinner === "player" && (
@@ -969,5 +1053,63 @@ function PreviewPiece({ col, board }: { col: number; board: Board }) {
         <SkullHead className="h-10 w-10 opacity-70 floaty" />
       </div>
     </div>
+  );
+}
+
+/* ---------------- Scythe mow button ---------------- */
+
+function MowButton({
+  label,
+  usedLabel,
+  used,
+  disabled,
+  onClick,
+  accent,
+}: {
+  label: string;
+  usedLabel: string;
+  used: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  accent: "orange" | "emerald";
+}) {
+  const accentRing =
+    accent === "orange"
+      ? "border-orange-500/70 hover:bg-orange-500/15 text-orange-300 shadow-[0_0_18px_rgba(255,120,0,0.22)]"
+      : "border-emerald-500/60 text-emerald-300 shadow-[0_0_14px_rgba(16,185,129,0.18)]";
+  return (
+    <button
+      onClick={onClick}
+      disabled={used || disabled}
+      aria-label={label}
+      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-creep transition-all ${
+        used
+          ? "border-stone-700/60 bg-black/30 text-amber-200/40"
+          : disabled
+            ? "border-purple-900/40 bg-black/30 text-amber-200/40"
+            : `${accentRing} bg-black/40 hover:scale-[1.03]`
+      }`}
+    >
+      <ScytheIcon className="h-6 w-6" />
+      <span className="whitespace-nowrap">
+        {used ? usedLabel : label}
+      </span>
+    </button>
+  );
+}
+
+function ScytheIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path
+        d="M21 4C13 4 6 9 5 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path d="M4 15 L7 18 L4 21 Z" fill="currentColor" opacity="0.7" />
+      <line x1="5" y1="16" x2="18" y2="20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }

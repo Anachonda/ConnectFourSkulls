@@ -86,36 +86,6 @@ export function mowBottomRow(board: Board): { board: Board; mowed: [number, numb
   return { board: next, mowed };
 }
 
-// The reaper claims one skull from each player: finds the lowest piece of
-// each player, removes it, and lets the pieces above fall down (gravity).
-export function reapSkulls(board: Board): { board: Board; mowed: [number, number][] } {
-  const next = board.map((row) => row.slice());
-  const mowed: [number, number][] = [];
-
-  for (const player of [1, 2] as Player[]) {
-    let target: [number, number] | null = null;
-    for (let r = ROWS - 1; r >= 0; r--) {
-      for (let c = 0; c < COLS; c++) {
-        if (next[r][c] === player) {
-          target = [r, c];
-          break;
-        }
-      }
-      if (target) break;
-    }
-    if (target) {
-      const [tr, tc] = target;
-      next[tr][tc] = 0;
-      mowed.push([tr, tc]);
-      for (let r = tr; r > 0; r--) {
-        next[r][tc] = next[r - 1][tc];
-      }
-      next[0][tc] = 0;
-    }
-  }
-  return { board: next, mowed };
-}
-
 // Evaluate a window of 4 cells for `me`.
 function scoreWindow(window: Cell[], me: Player): number {
   const opp = (me === 1 ? 2 : 1) as Player;
@@ -224,6 +194,30 @@ function minimax(
 export type Difficulty = "makkelijk" | "normaal" | "moeilijk";
 
 const DEPTH: Record<Difficulty, number> = { makkelijk: 1, normaal: 4, moeilijk: 6 };
+
+// Should the AI spend its one-per-round mow now? It should if mowing gives
+// it an immediate win, or blocks an opponent's immediate winning threat by
+// removing the bottom row (e.g. the opponent has three lined up on row 5).
+export function shouldAiMow(board: Board, ai: Player): boolean {
+  // Bottom row must have something to mow.
+  if (!board[ROWS - 1].some((v) => v !== 0)) return false;
+
+  const result = mowBottomRow(board);
+  const win = findWin(result.board);
+  if (win) return win.player === ai;
+
+  const human = (ai === 1 ? 2 : 1) as Player;
+  // Does the human currently have an immediate winning drop somewhere?
+  for (const c of validCols(board)) {
+    const d = drop(board, c, human);
+    if (d && findWin(d.board)?.player === human) {
+      // Mowing removes that threat only if it would no longer be a win.
+      const afterMow = drop(result.board, c, human);
+      if (!afterMow || findWin(afterMow.board)?.player !== human) return true;
+    }
+  }
+  return false;
+}
 
 // Pick the AI's best move. On "makkelijk" it mostly plays random with a little
 // blocking so a beginner can still win.
